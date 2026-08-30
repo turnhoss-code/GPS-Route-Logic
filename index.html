@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS-Route-Logic Developer & Legal Portal</title>
+    <style>
+        :root {
+            --bg-color: #070B14;
+            --card-bg: #0F172A;
+            --card-elevated: #18223C;
+            --neon-cyan: #00FFE0;
+            --pastel-cyan: #72EFDD;
+            --neon-pink: #FF2A85;
+            --speed-green: #10E775;
+            --text-primary: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --border-color: #2C3E6B;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 32px 16px;
+        }
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 36px;
+            box-shadow: 0 10px 30px rgba(0, 255, 224, 0.05);
+        }
+        .header {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 24px;
+            margin-bottom: 28px;
+            text-align: center;
+        }
+        .badge {
+            display: inline-block;
+            background: rgba(0, 255, 224, 0.15);
+            color: var(--neon-cyan);
+            border: 1px solid var(--neon-cyan);
+            padding: 4px 14px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+        h1 {
+            color: #FFFFFF;
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+        .tagline {
+            color: var(--pastel-cyan);
+            font-size: 15px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-top: 24px;
+        }
+        .card {
+            background: var(--card-elevated);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: var(--neon-cyan);
+        }
+        .card h3 {
+            color: #FFFFFF;
+            font-size: 17px;
+            margin-bottom: 8px;
+        }
+        .card p {
+            color: var(--text-secondary);
+            font-size: 13.5px;
+            margin-bottom: 16px;
+        }
+        .btn-link {
+            display: inline-block;
+            background: rgba(0, 255, 224, 0.15);
+            color: var(--neon-cyan);
+            border: 1px solid var(--neon-cyan);
+            padding: 8px 14px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+        }
+        .btn-link:hover {
+            background: var(--neon-cyan);
+            color: #070B14;
+        }
+        .footer {
+            margin-top: 36px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <span class="badge">Official Developer & Compliance Hub</span>
+            <h1>GPS-Route-Logic</h1>
+            <p class="tagline">Personalized AI Routing &bull; Live OBD-II Diagnostic Telemetry &bull; Voice Co-Pilot</p>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <div>
+                    <h3>📄 Privacy Policy</h3>
+                    <p>Comprehensive Google Play and GDPR compliant privacy terms detailing GPS location and OBD-II diagnostics usage.</p>
+                </div>
+                <a href="privacy-policy.html" class="btn-link">View Privacy Policy &rarr;</a>
+            </div>
+
+            <div class="card">
+                <div>
+                    <h3>📢 Advertisement Disclosure</h3>
+                    <p>AdMob policies, 100% ad-free subscription terms, and IAB Tech Lab verification parameters.</p>
+                </div>
+                <a href="advertisement-policy.html" class="btn-link">View Ad Policy &rarr;</a>
+            </div>
+
+            <div class="card">
+                <div>
+                    <h3>🛡️ app-ads.txt</h3>
+                    <p>IAB Tech Lab direct authorized seller crawler verification for AdMob (Publisher ID: pub-2800841113603313).</p>
+                </div>
+                <a href="app-ads.txt" class="btn-link">View app-ads.txt &rarr;</a>
+            </div>
+
+            <div class="card">
+                <div>
+                    <h3>🗑️ Request Data Deletion</h3>
+                    <p>Self-serve 1-click in-app deletion instructions and online web request form to permanently erase your account data.</p>
+                </div>
+                <a href="data-deletion.html" class="btn-link">Request Data Deletion &rarr;</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Package:</strong> <code>com.gpsroutelogic</code> &bull; <strong>Contact:</strong> <a href="mailto:turnhoss187@gmail.com" style="color: var(--neon-cyan);">turnhoss187@gmail.com</a></p>
+        </div>
+    </div>
+</body>
+</html>

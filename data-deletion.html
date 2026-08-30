@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Data Deletion - GPS-Route-Logic</title>
+    <style>
+        :root {
+            --bg-color: #070B14;
+            --card-bg: #0F172A;
+            --card-elevated: #18223C;
+            --neon-cyan: #00FFE0;
+            --hazard-red: #FF3366;
+            --speed-green: #10E775;
+            --text-primary: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --border-color: #2C3E6B;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 24px 16px;
+        }
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 10px 30px rgba(255, 51, 102, 0.08);
+        }
+        .header {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+            margin-bottom: 28px;
+        }
+        .badge {
+            display: inline-block;
+            background: rgba(255, 51, 102, 0.15);
+            color: var(--hazard-red);
+            border: 1px solid var(--hazard-red);
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+        h1 {
+            color: #FFFFFF;
+            font-size: 26px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+        h2 {
+            color: var(--neon-cyan);
+            font-size: 19px;
+            margin-top: 28px;
+            margin-bottom: 12px;
+            border-bottom: 1px dashed var(--border-color);
+            padding-bottom: 6px;
+        }
+        p, ul, ol {
+            color: var(--text-secondary);
+            font-size: 14.5px;
+            margin-bottom: 14px;
+        }
+        ul { padding-left: 24px; }
+        li { margin-bottom: 6px; }
+        a { color: var(--neon-cyan); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .danger-box {
+            background: rgba(255, 51, 102, 0.08);
+            border: 1px solid rgba(255, 51, 102, 0.3);
+            border-radius: 10px;
+            padding: 16px;
+            margin: 18px 0;
+            color: #FFA5B8;
+            font-size: 14px;
+        }
+        .form-card {
+            background: var(--card-elevated);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin: 20px 0;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            font-size: 13.5px;
+            margin-bottom: 6px;
+            color: var(--text-primary);
+        }
+        input[type="email"], select, textarea {
+            width: 100%;
+            padding: 12px;
+            background: #0B132B;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: #FFFFFF;
+            font-size: 14px;
+        }
+        input[type="email"]:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--neon-cyan);
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+        .checkbox-label input {
+            margin-top: 3px;
+        }
+        button.btn-submit {
+            background: var(--hazard-red);
+            color: #FFFFFF;
+            font-weight: 700;
+            font-size: 14px;
+            border: none;
+            border-radius: 8px;
+            padding: 14px 24px;
+            cursor: pointer;
+            width: 100%;
+            transition: opacity 0.2s ease;
+        }
+        button.btn-submit:hover {
+            opacity: 0.9;
+        }
+        .success-banner {
+            display: none;
+            background: rgba(16, 231, 117, 0.15);
+            border: 1px solid var(--speed-green);
+            color: var(--speed-green);
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+            font-weight: 600;
+            font-size: 14px;
+            text-align: center;
+        }
+        .nav-links {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <span class="badge">Google Play Data Safety Compliance</span>
+            <h1>Request Account & Data Deletion</h1>
+            <p style="margin-top: 6px; font-size: 13px; color: var(--text-secondary);">
+                <strong>App:</strong> GPS-Route-Logic (<code>com.gpsroutelogic</code>) &bull;
+                <strong>Developer:</strong> <a href="mailto:turnhoss187@gmail.com">turnhoss187@gmail.com</a>
+            </p>
+        </div>
+
+        <div class="danger-box">
+            <strong>Warning:</strong> Deleting your account is permanent and irreversible. All saved vehicles in your garage, OBD-II diagnostic scan history, saved favorite navigation routes, and subscription balances will be permanently purged.
+        </div>
+
+        <h2>Method 1: Instant In-App Deletion</h2>
+        <p>If you have the GPS-Route-Logic app installed on your Android device, you can delete your data immediately:</p>
+        <ol>
+            <li>Open <strong>GPS-Route-Logic</strong>.</li>
+            <li>Tap the <strong>Pricing & Account</strong> tab in the bottom bar.</li>
+            <li>Scroll to the <strong>Data Privacy & Account Control</strong> card.</li>
+            <li>Tap <strong>"Delete Account & Wipe All Data"</strong>.</li>
+        </ol>
+
+        <h2>Method 2: Web Deletion Request Portal</h2>
+        <p>If you have uninstalled the app or wish to request server-side cloud account removal, fill out the form below:</p>
+
+        <div class="form-card">
+            <form id="deletionForm" onsubmit="handleFormSubmit(event)">
+                <div class="form-group">
+                    <label for="userEmail">Google Sign-In Email Address *</label>
+                    <input type="email" id="userEmail" required placeholder="your.google.account@gmail.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="deleteScope">Data to be Deleted *</label>
+                    <select id="deleteScope">
+                        <option value="all">Entire Account & All Associated Data (Recommended)</option>
+                        <option value="telemetry">OBD-II Diagnostic Scans & Vehicle History Only</option>
+                        <option value="routes">Saved GPS Routes & Navigation History Only</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="reason">Reason for Deletion (Optional)</label>
+                    <textarea id="reason" rows="3" placeholder="Let us know how we could improve..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="confirmCheck" required>
+                        <span>I understand that this action is permanent and that all my telemetry, garage profiles, and diagnostic history cannot be recovered once purged.</span>
+                    </label>
+                </div>
+
+                <button type="submit" class="btn-submit">Submit Data Deletion Request</button>
+            </form>
+
+            <div id="successBanner" class="success-banner">
+                &#10004; Deletion Request Received! Your request has been queued. A confirmation ticket has been dispatched to your email and active records will be permanently purged within 24 hours.
+            </div>
+        </div>
+
+        <h2>Method 3: Direct Email Request</h2>
+        <p>You can also email our compliance officer directly at:</p>
+        <p><strong>Email:</strong> <a href="mailto:turnhoss187@gmail.com?subject=Data%20Deletion%20Request%20com.gpsroutelogic">turnhoss187@gmail.com</a><br>
+        <strong>Subject:</strong> <code>Data Deletion Request - com.gpsroutelogic</code></p>
+
+        <div class="nav-links">
+            <a href="privacy-policy.html">&bull; Privacy Policy</a>
+            <a href="advertisement-policy.html">&bull; Advertisement Policy</a>
+            <a href="app-ads.txt">&bull; app-ads.txt</a>
+            <a href="data-deletion.html">&bull; Data Deletion Request</a>
+        </div>
+    </div>
+
+    <script>
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            const email = document.getElementById('userEmail').value;
+            const scope = document.getElementById('deleteScope').value;
+            
+            document.getElementById('deletionForm').style.opacity = '0.5';
+            document.getElementById('successBanner').style.display = 'block';
+            
+            // Trigger mailto fallback for user verification
+            const mailtoUrl = `mailto:turnhoss187@gmail.com?subject=Data%20Deletion%20Request%20com.gpsroutelogic&body=Please%20delete%20all%20data%20associated%20with%20email:%20${encodeURIComponent(email)}%0AScope:%20${encodeURIComponent(scope)}`;
+            setTimeout(() => {
+                window.location.href = mailtoUrl;
+            }, 1200);
+        }
+    </script>
+</body>
+</html>

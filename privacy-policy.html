@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - GPS-Route-Logic</title>
+    <style>
+        :root {
+            --bg-color: #070B14;
+            --card-bg: #0F172A;
+            --card-elevated: #18223C;
+            --neon-cyan: #00FFE0;
+            --pastel-cyan: #72EFDD;
+            --neon-pink: #FF2A85;
+            --speed-green: #10E775;
+            --text-primary: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --border-color: #2C3E6B;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 24px 16px;
+        }
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 10px 30px rgba(0, 255, 224, 0.05);
+        }
+        .header {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+            margin-bottom: 28px;
+        }
+        .badge {
+            display: inline-block;
+            background: rgba(0, 255, 224, 0.15);
+            color: var(--neon-cyan);
+            border: 1px solid var(--neon-cyan);
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+        h1 {
+            color: #FFFFFF;
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+        h2 {
+            color: var(--neon-cyan);
+            font-size: 20px;
+            margin-top: 28px;
+            margin-bottom: 12px;
+            border-bottom: 1px dashed var(--border-color);
+            padding-bottom: 6px;
+        }
+        h3 {
+            color: var(--pastel-cyan);
+            font-size: 16px;
+            margin-top: 16px;
+            margin-bottom: 8px;
+        }
+        p, ul, ol {
+            color: var(--text-secondary);
+            font-size: 14.5px;
+            margin-bottom: 14px;
+        }
+        ul, ol {
+            padding-left: 24px;
+        }
+        li {
+            margin-bottom: 6px;
+        }
+        a {
+            color: var(--neon-cyan);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .nav-links {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            font-size: 13px;
+        }
+        .highlight-box {
+            background: var(--card-elevated);
+            border-left: 4px solid var(--neon-cyan);
+            padding: 14px;
+            border-radius: 8px;
+            margin: 16px 0;
+            font-size: 14px;
+            color: #E2E8F0;
+        }
+        .meta-info {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <span class="badge">Google Play Data Safety & GDPR Verified</span>
+            <h1>Privacy Policy for GPS-Route-Logic</h1>
+            <div class="meta-info">
+                <strong>Package:</strong> <code>com.gpsroutelogic</code> &bull; 
+                <strong>Effective Date:</strong> August 27, 2026 &bull; 
+                <strong>Contact:</strong> <a href="mailto:turnhoss187@gmail.com">turnhoss187@gmail.com</a>
+            </div>
+        </div>
+
+        <div class="highlight-box">
+            <strong>Summary:</strong> GPS-Route-Logic is built for drivers who value real-time personalized navigation, ECU diagnostic health, and voice co-pilot assistance. We prioritize on-device processing and never sell your personal data or live GPS tracks.
+        </div>
+
+        <h2>1. Information We Collect</h2>
+        <h3>A. Location Information (Precise & Approximate GPS)</h3>
+        <p>We collect your location while using the app to calculate turn-by-turn routes, dynamic traffic detour bypasses, and multi-profile route algorithms (Fastest Highway, Eco-Logic, Scenic, and Heavy Cargo). Background location is strictly limited to active navigation trips with a continuous foreground notification.</p>
+
+        <h3>B. OBD-II Automotive Telemetry</h3>
+        <p>When connected to an OBD-II adapter, the app reads ECU sensor metrics (RPM, speed, engine coolant temp, fuel trim, battery voltage) and Diagnostic Trouble Codes (DTCs). This data is kept in local device storage and is only backed up to cloud services if you log into your Google Account.</p>
+
+        <h3>C. User Credentials & Google Sign-In</h3>
+        <p>We use Android Jetpack Credential Manager to authenticate your account. We only receive your public display name, email address, and unique user identifier. We never store or receive your Google password.</p>
+
+        <h3>D. Voice & Gemini AI Interaction</h3>
+        <p>Voice commands ("Hey GPS") are transcribed on your device using Android speech services and forwarded to the Google Gemini API to return contextual automotive navigation advice. We do not store raw microphone audio recordings.</p>
+
+        <h3>E. Advertising Data (Free Tier Only)</h3>
+        <p>For users on our free ad-supported plan, Google AdMob may utilize standard mobile advertising identifiers (GAID) to provide relevant advertisements and verify reward completions. Subscribed users (Premium and PRO Max) operate in a 100% ad-free environment with ad SDK trackers disabled.</p>
+
+        <h2>2. Third-Party Sub-Processors</h2>
+        <ul>
+            <li><strong>Google DeepMind Gemini API:</strong> Contextual diagnostics analysis and automotive voice assistance.</li>
+            <li><strong>Google AdMob:</strong> Advertising delivery for free-tier users adhering to <code>app-ads.txt</code> (Publisher ID: <code>pub-2800841113603313</code>).</li>
+            <li><strong>Google Play Billing:</strong> Processing in-app subscription purchases securely.</li>
+            <li><strong>Google Credential Manager & Firebase Auth:</strong> Authentication and optional cloud sync.</li>
+        </ul>
+
+        <h2>3. Data Deletion and User Rights</h2>
+        <p>You have the absolute right to view, export, or permanently erase your data at any time:</p>
+        <ul>
+            <li><strong>Instant In-App Deletion:</strong> Tap <em>Account & Pricing &gt; Delete Account & Wipe All Data</em> to immediately delete all database entries and sign out.</li>
+            <li><strong>Web Deletion Portal:</strong> Submit a remote deletion request via our <a href="data-deletion.html">Data Deletion Request Portal</a>.</li>
+            <li><strong>Direct Email:</strong> Email <a href="mailto:turnhoss187@gmail.com?subject=Data%20Deletion%20Request%20com.gpsroutelogic">turnhoss187@gmail.com</a>.</li>
+        </ul>
+
+        <h2>4. Contact Information</h2>
+        <p>If you have any questions or data privacy inquiries, please contact our support team:</p>
+        <p><strong>Developer Email:</strong> <a href="mailto:turnhoss187@gmail.com">turnhoss187@gmail.com</a><br>
+        <strong>Legal Portal:</strong> <a href="https://ais-pre-7wsizo553tjveiu2qj2qmb-333894732567.us-west2.run.app">GPS-Route-Logic Developer Portal</a></p>
+
+        <div class="nav-links">
+            <a href="privacy-policy.html">&bull; Privacy Policy</a>
+            <a href="advertisement-policy.html">&bull; Advertisement Policy</a>
+            <a href="app-ads.txt">&bull; app-ads.txt</a>
+            <a href="data-deletion.html">&bull; Data Deletion Request</a>
+        </div>
+    </div>
+</body>
+</html>
