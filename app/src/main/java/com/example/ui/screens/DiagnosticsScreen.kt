@@ -33,6 +33,8 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Warning
+import com.example.ui.viewmodel.AppTab
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -100,113 +102,192 @@ fun DiagnosticsScreen(
 
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var newTaskName by remember { mutableStateOf("") }
-    var newTaskIntervalMiles by remember { mutableStateOf("5000") }
-    var newTaskIntervalMonths by remember { mutableStateOf("6") }
+    var newTaskIntervalMiles by remember { mutableStateOf("") }
+    var newTaskIntervalMonths by remember { mutableStateOf("") }
 
     val dateFormat = remember { SimpleDateFormat("MMM dd, yyyy • HH:mm", Locale.getDefault()) }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                Spacer(modifier = Modifier.height(4.dp))
+    var selectedDiagnosticSubTab by remember { mutableStateOf(0) } // 0: OBD2 Codes & Definitions, 1: Live Telematics HUD & Health
 
-                // Holographic Header Banner
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(130.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    border = BorderStroke(1.5.dp, NeonCyan.copy(alpha = 0.6f))
-                ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        Image(
-                            painter = painterResource(id = R.drawable.gps_route_logic_header),
-                            contentDescription = "GPS-Route-Logic Telematics Banner",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            Color.Black.copy(alpha = 0.35f),
-                                            Color.Black.copy(alpha = 0.85f)
-                                        )
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Holographic Header Banner
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .height(115.dp),
+                shape = RoundedCornerShape(18.dp),
+                border = BorderStroke(1.5.dp, NeonCyan.copy(alpha = 0.6f))
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Image(
+                        painter = painterResource(id = R.drawable.drive_logic_ai_developer_header),
+                        contentDescription = "DriveLogic AI Telematics Banner",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Black.copy(alpha = 0.35f),
+                                        Color.Black.copy(alpha = 0.85f)
                                     )
                                 )
-                        )
+                            )
+                    )
 
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(14.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = SpeedGreen.copy(alpha = 0.25f),
+                                border = BorderStroke(1.dp, SpeedGreen)
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = SpeedGreen.copy(alpha = 0.25f),
-                                    border = BorderStroke(1.dp, SpeedGreen)
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(6.dp)
-                                                .clip(CircleShape)
-                                                .background(SpeedGreen)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("OBD-II CAN LINKED", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = SpeedGreen)
-                                    }
-                                }
-
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = NeonCyan.copy(alpha = 0.2f),
-                                    border = BorderStroke(1.dp, NeonCyan)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(Icons.Default.CloudDone, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(12.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Cloud Run Active", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NeonCyan)
-                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(SpeedGreen)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("OBD-II CAN LINKED", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = SpeedGreen)
                                 }
                             }
 
-                            Column {
-                                Text(
-                                    text = "GPS-Route-Logic Diagnostics",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = "Real-Time Telematics & Room Cached ECU Intelligence",
-                                    fontSize = 11.sp,
-                                    color = NeonCyan
-                                )
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = NeonCyan.copy(alpha = 0.2f),
+                                border = BorderStroke(1.dp, NeonCyan)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.CloudDone, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(12.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Cloud Run Active", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NeonCyan)
+                                }
                             }
+                        }
+
+                        Column {
+                            Text(
+                                text = "GPS-Route-Logic Diagnostics",
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "OBD-II Fault Code Display, Definitions & Telematics HUD",
+                                fontSize = 11.sp,
+                                color = NeonCyan
+                            )
                         }
                     }
                 }
             }
+
+            // Sub-Tab Switcher: OBD2 Codes & Definitions vs CAN Telematics & Health
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .background(Color(0xFF0D1836), RoundedCornerShape(12.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Surface(
+                    onClick = { selectedDiagnosticSubTab = 0 },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(38.dp)
+                        .testTag("tab_obd2_diagnostics"),
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (selectedDiagnosticSubTab == 0) NeonCyan else Color.Transparent,
+                    border = if (selectedDiagnosticSubTab == 0) null else BorderStroke(1.dp, Color(0xFF263868))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = if (selectedDiagnosticSubTab == 0) Color.Black else NeonCyan,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "OBD2 Codes & Definitions",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (selectedDiagnosticSubTab == 0) Color.Black else Color.White
+                        )
+                    }
+                }
+
+                Surface(
+                    onClick = { selectedDiagnosticSubTab = 1 },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(38.dp)
+                        .testTag("tab_telematics_gauges"),
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (selectedDiagnosticSubTab == 1) NeonCyan else Color.Transparent,
+                    border = if (selectedDiagnosticSubTab == 1) null else BorderStroke(1.dp, Color(0xFF263868))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Speed,
+                            contentDescription = null,
+                            tint = if (selectedDiagnosticSubTab == 1) Color.Black else NeonCyan,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "CAN Gauges & Health",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (selectedDiagnosticSubTab == 1) Color.Black else Color.White
+                        )
+                    }
+                }
+            }
+
+            if (selectedDiagnosticSubTab == 0) {
+                Obd2DiagnosticScreen(
+                    viewModel = viewModel,
+                    onNavigateToVoice = { viewModel.selectTab(AppTab.VOICE) }
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
 
             // Quota Bar
             item {
@@ -1171,6 +1252,8 @@ fun DiagnosticsScreen(
                 Spacer(modifier = Modifier.height(80.dp))
             }
         }
+    }
+}
 
         // Add Task Dialog
         if (showAddTaskDialog) {
@@ -1182,19 +1265,22 @@ fun DiagnosticsScreen(
                         OutlinedTextField(
                             value = newTaskName,
                             onValueChange = { newTaskName = it },
-                            label = { Text("Task Name (e.g. Brake Fluid)") },
+                            label = { Text("Task Name") },
+                            placeholder = { Text("e.g. Brake Fluid, Cabin Filter") },
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = newTaskIntervalMiles,
                             onValueChange = { newTaskIntervalMiles = it },
                             label = { Text("Interval (Miles)") },
+                            placeholder = { Text("e.g. 5000") },
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = newTaskIntervalMonths,
                             onValueChange = { newTaskIntervalMonths = it },
                             label = { Text("Interval (Months)") },
+                            placeholder = { Text("e.g. 6") },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -1208,6 +1294,8 @@ fun DiagnosticsScreen(
                                 viewModel.addMaintenanceTask(newTaskName, "custom", miles, months)
                                 showAddTaskDialog = false
                                 newTaskName = ""
+                                newTaskIntervalMiles = ""
+                                newTaskIntervalMonths = ""
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = NeonCyan)
@@ -1216,7 +1304,12 @@ fun DiagnosticsScreen(
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showAddTaskDialog = false }) {
+                    TextButton(onClick = {
+                        showAddTaskDialog = false
+                        newTaskName = ""
+                        newTaskIntervalMiles = ""
+                        newTaskIntervalMonths = ""
+                    }) {
                         Text("Cancel")
                     }
                 }

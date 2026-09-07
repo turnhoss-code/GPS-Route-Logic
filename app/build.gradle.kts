@@ -14,7 +14,7 @@ android {
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.gpsroutelogic"
+    applicationId = "com.aistudio.gpsroutelogic.uid"
     minSdk = 24
     targetSdk = 36
     // Automated incremental version code based on build property or build timestamp

@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "GPS-Route-Logic"
+rootProject.name = "GPS Route Logic"
 
 include(":app")

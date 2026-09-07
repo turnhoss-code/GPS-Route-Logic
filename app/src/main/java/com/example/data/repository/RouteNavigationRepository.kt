@@ -40,6 +40,8 @@ class RouteNavigationRepository(
     )
 
     fun calculatePersonalizedRoutes(origin: String, destination: String): List<RouteOption> {
+        val originLabel = origin.trim().ifBlank { "Current Location" }
+        val destLabel = destination.trim().ifBlank { "Selected Destination" }
         val baseDistance = 14.8
         val baseMinutes = 26
 
@@ -56,7 +58,7 @@ class RouteNavigationRepository(
             co2SavedKg = 0.4,
             summary = "Direct highway connection with active flow bypass sensors.",
             personalizedReason = "Best for quick arrival during evening rush hour.",
-            waypoints = listOf(origin, "I-80 Express Tollway", "Exit 44B", destination),
+            waypoints = listOf(originLabel, "I-80 Express Tollway", "Exit 44B", destLabel),
             incidents = listOf(
                 TrafficIncident(
                     id = "inc_01",
@@ -83,7 +85,7 @@ class RouteNavigationRepository(
             co2SavedKg = 1.9,
             summary = "Synchronized traffic lights & constant speed cruising to minimize braking.",
             personalizedReason = "Saves ~0.35 gal fuel ($1.45) & reduces brake pad wear.",
-            waypoints = listOf(origin, "Grand Avenue Parkway", "Boulevard 101", destination),
+            waypoints = listOf(originLabel, "Grand Avenue Parkway", "Boulevard 101", destLabel),
             incidents = emptyList()
         )
 
@@ -100,7 +102,7 @@ class RouteNavigationRepository(
             co2SavedKg = 0.8,
             summary = "Sweeping curves, scenic vistas, and ultra-smooth asphalt quality.",
             personalizedReason = "Ideal for relaxed driving with zero highway stress.",
-            waypoints = listOf(origin, "Skyline Overlook Rd", "Valley Ridge", destination),
+            waypoints = listOf(originLabel, "Skyline Overlook Rd", "Valley Ridge", destLabel),
             incidents = listOf(
                 TrafficIncident(
                     id = "inc_02",
@@ -127,7 +129,7 @@ class RouteNavigationRepository(
             co2SavedKg = 0.2,
             summary = "Guaranteed 14'6\" bridge clearance, wide turning radius, certified axle weight.",
             personalizedReason = "Prevents low-clearance hazards & steep 8%+ gradients.",
-            waypoints = listOf(origin, "Industrial Bypass Ring", "Freight Hub Connector", destination),
+            waypoints = listOf(originLabel, "Industrial Bypass Ring", "Freight Hub Connector", destLabel),
             incidents = emptyList()
         )
 

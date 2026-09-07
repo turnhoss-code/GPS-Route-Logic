@@ -63,7 +63,7 @@ class FirestoreRepository {
             // 1. Update user metadata
             val profileData = mapOf(
                 "lastSync" to System.currentTimeMillis(),
-                "appId" to "com.gpsroutelogic",
+                "appId" to "com.aistudio.gpsroutelogic.uid",
                 "projectId" to "gps-route-logic",
                 "scanCount" to scans.size,
                 "vehicleCount" to vehicles.size,

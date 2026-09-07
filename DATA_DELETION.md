@@ -1,9 +1,9 @@
 # User Data & Account Deletion Policy & Request Guide
 
 **Application Name:** GPS-Route-Logic  
-**Package Name:** `com.gpsroutelogic`  
+**Package Name:** `com.aistudio.gpsroutelogic.uid`  
 **Deletion Request Web Portal:** https://ais-pre-7wsizo553tjveiu2qj2qmb-333894732567.us-west2.run.app/data-deletion.html  
-**Developer Contact:** turnhoss187@gmail.com  
+**Developer Contact:** support@gpsroutelogic.com  
 **Last Updated:** August 27, 2026  
 
 ---
@@ -52,8 +52,8 @@ Enter your registered Google Sign-In email and tap **"Submit Deletion Request"**
 
 ### Option B: Email Support
 Send an email to:
-- **Email:** turnhoss187@gmail.com
-- **Subject:** `Data Deletion Request - com.gpsroutelogic`
+- **Email:** support@gpsroutelogic.com
+- **Subject:** `Data Deletion Request - com.aistudio.gpsroutelogic.uid`
 - **Body:** Please include the email address associated with your Google Sign-In account.
 
 ---

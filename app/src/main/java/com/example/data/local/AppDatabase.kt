@@ -8,6 +8,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.example.data.model.ChatMessageEntity
 import com.example.data.model.DamageEvent
 import com.example.data.model.DiagnosticScanRecord
 import com.example.data.model.MaintenanceTask
@@ -50,6 +51,9 @@ interface VehicleDao {
 
     @Query("DELETE FROM vehicle_profiles")
     suspend fun clearAllVehicles()
+
+    @Query("SELECT COUNT(*) FROM vehicle_profiles")
+    suspend fun getVehicleCount(): Int
 }
 
 @Dao
@@ -109,6 +113,27 @@ interface TripLogDao {
     suspend fun clearAll()
 }
 
+@Dao
+interface ChatDao {
+    @Query("SELECT * FROM chat_messages ORDER BY timestamp ASC")
+    fun getAllMessages(): Flow<List<ChatMessageEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMessage(message: ChatMessageEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMessages(messages: List<ChatMessageEntity>)
+
+    @Query("DELETE FROM chat_messages WHERE id = :id")
+    suspend fun deleteMessage(id: String)
+
+    @Query("DELETE FROM chat_messages")
+    suspend fun clearAllMessages()
+
+    @Query("SELECT COUNT(*) FROM chat_messages")
+    suspend fun getMessageCount(): Int
+}
+
 @Database(
     entities = [
         DiagnosticScanRecord::class,
@@ -116,9 +141,10 @@ interface TripLogDao {
         SavedRouteRecord::class,
         MaintenanceTask::class,
         DamageEvent::class,
-        TripLog::class
+        TripLog::class,
+        ChatMessageEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -128,6 +154,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun maintenanceDao(): MaintenanceDao
     abstract fun damageDao(): DamageDao
     abstract fun tripLogDao(): TripLogDao
+    abstract fun chatDao(): ChatDao
 
     companion object {
         @Volatile

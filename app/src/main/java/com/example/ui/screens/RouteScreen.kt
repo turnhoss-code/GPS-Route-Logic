@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Landscape
 import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Place
@@ -233,6 +234,20 @@ fun RouteScreen(
                                 value = origin,
                                 onValueChange = { viewModel.updateOrigin(it) },
                                 label = { Text("Starting Location", fontSize = 12.sp) },
+                                placeholder = { Text("Enter starting point or tap GPS", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                trailingIcon = {
+                                    IconButton(
+                                        onClick = { viewModel.updateOrigin("📍 Current Location (450 Mission St, SF)") },
+                                        modifier = Modifier.testTag("use_current_location_button")
+                                    ) {
+                                        Icon(
+                                            Icons.Default.MyLocation,
+                                            contentDescription = "Use Current Location",
+                                            tint = NeonCyan,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                },
                                 modifier = Modifier
                                     .weight(1f)
                                     .testTag("origin_input_field"),
@@ -261,6 +276,7 @@ fun RouteScreen(
                                 value = destination,
                                 onValueChange = { viewModel.updateDestination(it) },
                                 label = { Text("Destination", fontSize = 12.sp) },
+                                placeholder = { Text("Enter destination address or landmark", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 modifier = Modifier
                                     .weight(1f)
                                     .testTag("destination_input_field"),

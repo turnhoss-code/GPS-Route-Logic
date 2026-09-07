@@ -252,7 +252,7 @@ fun AccountScreen(
                         }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Package: com.gpsroutelogic",
+                            text = "Package: com.aistudio.gpsroutelogic.uid",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White
@@ -423,7 +423,7 @@ fun AccountScreen(
                         Spacer(modifier = Modifier.height(10.dp))
                         Text("• 3 AI Diagnostic Scans / Data-sets a day", fontSize = 12.sp)
                         Text("• Standard GPS Navigation & Traffic Alerts", fontSize = 12.sp)
-                        Text("• 5 Voice Co-Pilot tokens daily", fontSize = 12.sp)
+                        Text("• 5 Gemini Real-Time Live-Chat sessions daily", fontSize = 12.sp)
                         Text("• Banner & Rewarded Video Ads included", fontSize = 12.sp, color = AlertAmber)
 
                         Spacer(modifier = Modifier.height(12.dp))
@@ -501,8 +501,8 @@ fun AccountScreen(
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text("• 10 AI Diagnostic Scans / Data-sets a day", fontSize = 12.sp)
-                        Text("• 25 Live Voice Co-Pilot Tokens per day", fontSize = 12.sp)
+                        Text("• 15 AI Diagnostic Scans / Data-sets a day", fontSize = 12.sp)
+                        Text("• 35 Real-Time Gemini Live-Chat Sessions / day", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ElectricBlue)
                         Text("• 100% Ad-Free Experience", fontSize = 12.sp, color = SpeedGreen)
                         Text("• Advanced Personalized Routes (Fastest, Eco, Scenic, Heavy)", fontSize = 12.sp)
                         Text("• Real-Time Lane Assist & Incident Bypass", fontSize = 12.sp)
@@ -531,7 +531,7 @@ fun AccountScreen(
                 }
             }
 
-            // TIER 3: PRO ($9.99/mo or $89.99/yr)
+            // TIER 3: PRO ($8.99/mo or $84.99/yr)
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -556,19 +556,19 @@ fun AccountScreen(
 
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
-                                    text = if (billingPeriod == BillingPeriod.MONTHLY) "$9.99 / mo" else "$89.99 / yr",
+                                    text = if (billingPeriod == BillingPeriod.MONTHLY) "$8.99 / mo" else "$84.99 / yr",
                                     fontWeight = FontWeight.ExtraBold,
                                     fontSize = 18.sp,
                                     color = GoldPro
                                 )
                                 if (billingPeriod == BillingPeriod.YEARLY) {
-                                    Text("Save 25% vs monthly", fontSize = 10.sp, color = GoldPro, fontWeight = FontWeight.Bold)
+                                    Text("Save 21% vs monthly", fontSize = 10.sp, color = GoldPro, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text("• UNLIMITED Live Voice Chat & Co-Pilot", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GoldPro)
+                        Text("• UNLIMITED Real-Time Gemini Live-Chat & Voice Co-Pilot", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GoldPro)
                         Text("• 50 AI Diagnostic Scans / Data-sets a day", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Text("• Deep OBD-II Freeze Frame ECU Sensor Inspection", fontSize = 12.sp)
                         Text("• Multi-Stop Optimized Personalized Route Engine", fontSize = 12.sp)
@@ -622,7 +622,7 @@ fun AccountScreen(
 
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Google Play Data Safety & IAB Tech Lab compliance verified for package com.gpsroutelogic",
+                            text = "Google Play Data Safety & IAB Tech Lab compliance verified for package com.aistudio.gpsroutelogic.uid",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -699,7 +699,7 @@ fun AccountScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "GPS-Route-Logic (com.gpsroutelogic)",
+                            text = "GPS-Route-Logic (com.aistudio.gpsroutelogic.uid)",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White

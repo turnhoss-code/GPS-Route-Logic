@@ -48,11 +48,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Image
 import com.example.data.model.BillingPeriod
 import com.example.data.model.SubscriptionTier
 import com.example.ui.screens.AccountScreen
@@ -99,8 +103,24 @@ fun MainApp(viewModel: MainViewModel) {
     val billingPeriod by viewModel.selectedBillingPeriod.collectAsState()
     val user by viewModel.userAccount.collectAsState()
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val audioPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        viewModel.greetUserOnOpen(force = true)
+    }
+
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        viewModel.greetUserOnOpen()
+        val hasMicPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.RECORD_AUDIO
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (!hasMicPermission) {
+            audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+        } else {
+            viewModel.greetUserOnOpen()
+        }
     }
 
     Scaffold(
@@ -262,8 +282,28 @@ fun MainApp(viewModel: MainViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.background)
         ) {
+            // Global Cockpit Holographic Backdrop
+            Image(
+                painter = painterResource(id = R.drawable.drive_logic_ai_developer_header),
+                contentDescription = "DriveLogic AI Cockpit Backdrop",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+            // Cyberpunk dark gradient scrim to ensure complete contrast and legibility
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFF070B19).copy(alpha = 0.86f),
+                                Color(0xFF0A1128).copy(alpha = 0.93f)
+                            )
+                        )
+                    )
+            )
+
             when (currentTab) {
                 AppTab.ROUTE -> RouteScreen(viewModel = viewModel)
                 AppTab.DIAGNOSTICS -> DiagnosticsScreen(viewModel = viewModel)
@@ -312,7 +352,7 @@ fun MainApp(viewModel: MainViewModel) {
                                         color = ElectricBlue
                                     )
                                 }
-                                Text("• 10 Scans/day + 25 Chat Tokens + Ad-Free", fontSize = 11.sp)
+                                Text("• 15 Scans/day + 35 Live-Chat Sessions + Ad-Free", fontSize = 11.sp)
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Button(
                                     onClick = { viewModel.upgradeSubscription(SubscriptionTier.PREMIUM) },
@@ -341,12 +381,12 @@ fun MainApp(viewModel: MainViewModel) {
                                 ) {
                                     Text("PRO Max Plan", fontWeight = FontWeight.ExtraBold, color = GoldPro)
                                     Text(
-                                        if (billingPeriod == BillingPeriod.MONTHLY) "$9.99/mo" else "$89.99/yr",
+                                        if (billingPeriod == BillingPeriod.MONTHLY) "$8.99/mo" else "$84.99/yr",
                                         fontWeight = FontWeight.Bold,
                                         color = GoldPro
                                     )
                                 }
-                                Text("• 50 Scans/day + Unlimited Chat + Full ECU Features", fontSize = 11.sp)
+                                Text("• 50 Scans/day + Unlimited Real-Time Chat + Full ECU Features", fontSize = 11.sp)
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Button(
                                     onClick = { viewModel.upgradeSubscription(SubscriptionTier.PRO) },

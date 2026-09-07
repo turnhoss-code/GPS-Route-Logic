@@ -1,5 +1,5 @@
 {
-  "name": "GPS-Route-Logic",
+  "name": "GPS Route Logic",
   "description": "AI-powered vehicle diagnostics, OBD-II telemetry, personalized GPS route suggestions, real-time traffic updates, and voice co-pilot navigation.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

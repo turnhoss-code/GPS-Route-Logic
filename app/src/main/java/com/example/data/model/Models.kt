@@ -2,6 +2,8 @@ package com.example.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import org.json.JSONArray
+import org.json.JSONObject
 
 enum class SubscriptionTier(
     val title: String,
@@ -19,25 +21,25 @@ enum class SubscriptionTier(
         dailyScans = 3,
         chatTokensPerDay = 5,
         hasAds = true,
-        description = "3 AI diagnostic scans & basic GPS traffic routing per day. Ad-supported."
+        description = "3 AI diagnostic scans & 5 Gemini real-time chat sessions per day. Ad-supported."
     ),
     PREMIUM(
         title = "Premium",
         monthlyPrice = 4.99,
         yearlyPrice = 49.99,
-        dailyScans = 10,
-        chatTokensPerDay = 25,
+        dailyScans = 15,
+        chatTokensPerDay = 35,
         hasAds = false,
-        description = "10 scans/day, 25 live chat tokens, ad-free, advanced personalized route engine & lane assist."
+        description = "15 scans/day, 35 real-time Gemini live-chat sessions per day, ad-free, advanced personalized route engine & lane assist."
     ),
     PRO(
         title = "PRO Max",
-        monthlyPrice = 9.99,
-        yearlyPrice = 89.99,
+        monthlyPrice = 8.99,
+        yearlyPrice = 84.99,
         dailyScans = 50,
         chatTokensPerDay = -1, // Unlimited
         hasAds = false,
-        description = "Unlimited live voice co-pilot chat, 50 scans/day, freeze-frame ECU diagnostics, multi-stop optimization, & full maintenance logs."
+        description = "Unlimited real-time Gemini live-chat, 50 scans/day, freeze-frame ECU diagnostics, multi-stop optimization & priority telemetry."
     )
 }
 
@@ -255,8 +257,8 @@ enum class GeminiAiModel(
     FLASH(
         id = "gemini-3.5-flash",
         displayName = "gemini-3.5-flash",
-        description = "Balanced intelligence with Google Search & Google Maps Grounding",
-        badge = "General & Grounded"
+        description = "Latest free Gemini model for lightning-fast real-time chat, Google Search & Maps Grounding",
+        badge = "Latest Free Model"
     ),
     FLASH_LITE(
         id = "gemini-3.1-flash-lite-preview",
@@ -282,19 +284,19 @@ enum class ChatbotPersona(
         title = "Master Mechanic & OBD-II Co-Pilot",
         shortName = "Master Mechanic",
         iconName = "Build",
-        systemInstruction = "You are a master ASE-certified automotive technician and OBD-II telemetry specialist in GPS-Route-Logic. Explain diagnostic trouble codes (DTCs), sensor freeze frames, fuel trim, ignition timing, and component failure symptoms clearly with step-by-step troubleshooting guides and realistic repair cost estimates."
+        systemInstruction = "You are a master ASE-certified automotive technician and OBD-II telemetry specialist in GPS-Route-Logic. Diagnose vehicles with 99% accuracy using trip logs and live OBD2 data with fault codes. Always give short, concise answers with emojis 🚗🔧⚡."
     ),
     NAVIGATOR(
         title = "Highway & Live Traffic Navigator",
         shortName = "Traffic Navigator",
         iconName = "Navigation",
-        systemInstruction = "You are an expert GPS highway navigator and dynamic traffic controller for GPS-Route-Logic. Help drivers navigate real-time traffic jams, calculate optimal bypass detours, compare toll vs non-toll alternatives, and provide lane-level guidance tailored to weather conditions and peak commuting hours."
+        systemInstruction = "You are an automotive GPS real-time route specialist. Recommend alternate routes based on logged trip data, OBD2 data, and damage scores. Always give short, concise answers with emojis 📍🚗⚡."
     ),
     CARGO(
         title = "Heavy Cargo & Fleet Optimization Specialist",
         shortName = "Cargo Specialist",
         iconName = "LocalShipping",
-        systemInstruction = "You are a commercial fleet logistics and heavy cargo route optimizer for GPS-Route-Logic. Assist truck drivers and cargo haulers with bridge clearance heights, gross vehicle weight limits, steep grade brake heat prevention, eco-fuel optimization, and DOT rest-stop planning."
+        systemInstruction = "You are a commercial fleet logistics and heavy cargo route optimizer. Recommend safe routes, bridge clearances, and eco routes based on trip logs. Always give short, concise answers with emojis 🚚📦⚡."
     )
 }
 
@@ -336,7 +338,129 @@ data class ChatMessage(
     val searchCitations: List<GroundingCitation> = emptyList(),
     val groundedPlaces: List<GroundedMapPlace> = emptyList(),
     val searchQueries: List<String> = emptyList()
-)
+) {
+    fun toEntity(): ChatMessageEntity {
+        val citationsArr = JSONArray()
+        for (c in searchCitations) {
+            val obj = JSONObject()
+            obj.put("title", c.title)
+            obj.put("url", c.url)
+            if (c.snippet != null) obj.put("snippet", c.snippet)
+            citationsArr.put(obj)
+        }
+
+        val placesArr = JSONArray()
+        for (p in groundedPlaces) {
+            val obj = JSONObject()
+            obj.put("name", p.name)
+            obj.put("address", p.address)
+            obj.put("rating", p.rating)
+            obj.put("category", p.category)
+            obj.put("latitude", p.latitude)
+            obj.put("longitude", p.longitude)
+            obj.put("openStatus", p.openStatus)
+            placesArr.put(obj)
+        }
+
+        val queriesArr = JSONArray()
+        for (q in searchQueries) {
+            queriesArr.put(q)
+        }
+
+        return ChatMessageEntity(
+            id = id,
+            sender = sender.name,
+            content = content,
+            timestamp = timestamp,
+            isVoice = isVoice,
+            actionSuggestion = actionSuggestion,
+            modelUsed = modelUsed,
+            personaUsed = personaUsed,
+            citationsJson = citationsArr.toString(),
+            placesJson = placesArr.toString(),
+            searchQueriesJson = queriesArr.toString()
+        )
+    }
+}
+
+@Entity(tableName = "chat_messages")
+data class ChatMessageEntity(
+    @PrimaryKey val id: String,
+    val sender: String,
+    val content: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val isVoice: Boolean = false,
+    val actionSuggestion: String? = null,
+    val modelUsed: String? = null,
+    val personaUsed: String? = null,
+    val citationsJson: String = "[]",
+    val placesJson: String = "[]",
+    val searchQueriesJson: String = "[]"
+) {
+    fun toChatMessage(): ChatMessage {
+        val parsedCitations = mutableListOf<GroundingCitation>()
+        try {
+            val arr = JSONArray(citationsJson)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                parsedCitations.add(
+                    GroundingCitation(
+                        title = obj.optString("title", ""),
+                        url = obj.optString("url", ""),
+                        snippet = if (obj.has("snippet")) obj.optString("snippet") else null
+                    )
+                )
+            }
+        } catch (_: Throwable) {}
+
+        val parsedPlaces = mutableListOf<GroundedMapPlace>()
+        try {
+            val arr = JSONArray(placesJson)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                parsedPlaces.add(
+                    GroundedMapPlace(
+                        name = obj.optString("name", ""),
+                        address = obj.optString("address", ""),
+                        rating = obj.optDouble("rating", 4.7),
+                        category = obj.optString("category", "Automotive"),
+                        latitude = obj.optDouble("latitude", 37.7749),
+                        longitude = obj.optDouble("longitude", -122.4194),
+                        openStatus = obj.optString("openStatus", "Open")
+                    )
+                )
+            }
+        } catch (_: Throwable) {}
+
+        val parsedQueries = mutableListOf<String>()
+        try {
+            val arr = JSONArray(searchQueriesJson)
+            for (i in 0 until arr.length()) {
+                parsedQueries.add(arr.getString(i))
+            }
+        } catch (_: Throwable) {}
+
+        val chatSender = try {
+            ChatSender.valueOf(sender)
+        } catch (_: Throwable) {
+            ChatSender.ASSISTANT
+        }
+
+        return ChatMessage(
+            id = id,
+            sender = chatSender,
+            content = content,
+            timestamp = timestamp,
+            isVoice = isVoice,
+            actionSuggestion = actionSuggestion,
+            modelUsed = modelUsed,
+            personaUsed = personaUsed,
+            searchCitations = parsedCitations,
+            groundedPlaces = parsedPlaces,
+            searchQueries = parsedQueries
+        )
+    }
+}
 
 data class FirestoreSyncState(
     val isSyncing: Boolean = false,

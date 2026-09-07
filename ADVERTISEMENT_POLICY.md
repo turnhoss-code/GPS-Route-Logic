@@ -1,10 +1,10 @@
 # Advertisement Policy & AdMob Disclosure
 
 **Application Name:** GPS-Route-Logic  
-**Package Name:** `com.gpsroutelogic`  
+**Package Name:** `com.aistudio.gpsroutelogic.uid`  
 **Publisher ID:** `pub-2800841113603313`  
 **app-ads.txt URL:** https://ais-pre-7wsizo553tjveiu2qj2qmb-333894732567.us-west2.run.app/app-ads.txt  
-**Developer Contact:** turnhoss187@gmail.com  
+**Developer Contact:** support@gpsroutelogic.com  
 **Last Updated:** August 27, 2026  
 
 ---
@@ -56,5 +56,5 @@ are guaranteed a **completely 100% ad-free experience**. All third-party adverti
 ## 5. Contact & Ad Inquiries
 
 For questions regarding advertising practices or brand sponsorship inquiries:
-- **Email:** turnhoss187@gmail.com
+- **Email:** support@gpsroutelogic.com
 - **Publisher Portal:** https://ais-pre-7wsizo553tjveiu2qj2qmb-333894732567.us-west2.run.app/advertisement-policy.html

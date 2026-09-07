@@ -10,6 +10,7 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.Voice
 import android.util.Log
 import com.example.data.auth.AuthManager
+import com.example.data.local.ChatDao
 import com.example.data.model.ChatMessage
 import com.example.data.model.ChatSender
 import com.example.data.model.ChatbotPersona
@@ -37,7 +38,8 @@ enum class GeminiFemaleVoice(val displayName: String, val personaDescription: St
 
 class VoiceAssistantRepository(
     private val context: Context,
-    private val authManager: AuthManager
+    private val authManager: AuthManager,
+    private val chatDao: ChatDao
 ) : TextToSpeech.OnInitListener {
 
     private val TAG = "VoiceAssistantRepo"
@@ -49,22 +51,11 @@ class VoiceAssistantRepository(
     private var onSttCallback: ((String) -> Unit)? = null
     private var telemetryContextProvider: (() -> String)? = null
 
-    private val _messages = MutableStateFlow<List<ChatMessage>>(
-        listOf(
-            ChatMessage(
-                id = UUID.randomUUID().toString(),
-                sender = ChatSender.ASSISTANT,
-                content = "👋 Hello! I'm Route Logic, your Gemini automotive diagnostic specialist and GPS co-pilot. I analyze ELM327 OBD-II codes, live CAN sensors, road damage accelerometer data, and weather conditions. How can I help you?",
-                isVoice = true,
-                modelUsed = "gemini-3.5-flash",
-                personaUsed = "Master Mechanic & OBD-II Co-Pilot"
-            )
-        )
-    )
+    private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
 
     // Model, Persona, and Voice selection
-    private val _selectedModel = MutableStateFlow(GeminiAiModel.FLASH)
+    private val _selectedModel = MutableStateFlow(GeminiAiModel.FLASH) // Latest free model gemini-3.5-flash
     val selectedModel: StateFlow<GeminiAiModel> = _selectedModel.asStateFlow()
 
     private val _selectedPersona = MutableStateFlow(ChatbotPersona.MECHANIC)
@@ -80,7 +71,7 @@ class VoiceAssistantRepository(
     val mapsGroundingEnabled: StateFlow<Boolean> = _mapsGroundingEnabled.asStateFlow()
 
     // Voice & Live API State
-    private val _liveVoiceState = MutableStateFlow(LiveVoiceSessionState.DISCONNECTED)
+    private val _liveVoiceState = MutableStateFlow(LiveVoiceSessionState.CONNECTED_IDLE)
     val liveVoiceState: StateFlow<LiveVoiceSessionState> = _liveVoiceState.asStateFlow()
 
     private val _audioWaveformEnergy = MutableStateFlow(0.15f)
@@ -92,10 +83,16 @@ class VoiceAssistantRepository(
     private val _isProcessing = MutableStateFlow(false)
     val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
 
-    private val _liveTranscript = MutableStateFlow("")
+    private val _liveTranscript = MutableStateFlow("Hi, I'm GPS Route Logic A.I.. How can I help today?")
     val liveTranscript: StateFlow<String> = _liveTranscript.asStateFlow()
 
-    // Speech-To-Text (STT) States
+    // Speech-To-Text (STT) & Open Mic / Wake Word States
+    private val _isOpenMicEnabled = MutableStateFlow(true)
+    val isOpenMicEnabled: StateFlow<Boolean> = _isOpenMicEnabled.asStateFlow()
+
+    private val _wakeWordDetected = MutableStateFlow<String?>(null)
+    val wakeWordDetected: StateFlow<String?> = _wakeWordDetected.asStateFlow()
+
     private val _isSttListening = MutableStateFlow(false)
     val isSttListening: StateFlow<Boolean> = _isSttListening.asStateFlow()
 
@@ -106,13 +103,37 @@ class VoiceAssistantRepository(
     val sttError: StateFlow<String?> = _sttError.asStateFlow()
 
     private var waveformJob: Job? = null
+    private var restartListeningJob: Job? = null
     private val repoScope = CoroutineScope(Dispatchers.Main)
+
+    // Wake Word Regex Patterns ("Hey Logic", "Hi Logic", "Logic", "Hey Route Logic")
+    private val wakeWordRegex = Regex("(?i)\\b(?:hey|hi|hello|ok|okay)?\\s*logic\\b")
+    private val wakeWordPrefixCleanRegex = Regex("(?i)^(?:hey|hi|hello|ok|okay)?\\s*logic[,:.]?\\s*")
 
     init {
         try {
             tts = TextToSpeech(context.applicationContext, this)
         } catch (e: Exception) {
             Log.w(TAG, "TTS init exception: ${e.message}")
+        }
+
+        // Observe persistent chat messages from Room DB
+        repoScope.launch(Dispatchers.IO) {
+            chatDao.getAllMessages().collect { entities ->
+                if (entities.isEmpty()) {
+                    val initialGreeting = ChatMessage(
+                        id = UUID.randomUUID().toString(),
+                        sender = ChatSender.ASSISTANT,
+                        content = "Hi, I'm GPS Route Logic A.I.. How can I help today?",
+                        isVoice = true,
+                        modelUsed = "gemini-3.1-flash-live-preview",
+                        personaUsed = "Master Mechanic & OBD-II Co-Pilot"
+                    )
+                    chatDao.insertMessage(initialGreeting.toEntity())
+                } else {
+                    _messages.value = entities.map { it.toChatMessage() }
+                }
+            }
         }
     }
 
@@ -125,7 +146,7 @@ class VoiceAssistantRepository(
             applyFemaleVoiceConfiguration()
             isTtsReady = true
 
-            // Greet user with Gemini female voice on app open
+            // Greet user with Gemini female voice & open mic upon app start-up
             greetUserOnOpen(force = false)
         }
     }
@@ -135,9 +156,17 @@ class VoiceAssistantRepository(
             val femaleVoiceConfig = _selectedFemaleVoice.value
             tts?.language = Locale.US
 
-            // Search for natural female voice in installed TTS voices
+            // Search for high-quality natural female voice in installed TTS voices
             val availableVoices = tts?.voices
-            val femaleVoice = availableVoices?.firstOrNull { v ->
+            val highQualityFemaleVoice = availableVoices?.firstOrNull { v ->
+                val name = v.name.lowercase()
+                val lang = v.locale?.language.orEmpty().lowercase()
+                val isUsOrEn = lang == "en" || lang.startsWith("en")
+                val isNetworkOrNeural = name.contains("network") || name.contains("neural") || name.contains("sfg") || name.contains("iol") || name.contains("tpf")
+                val isFemale = name.contains("female") || name.contains("f0") || name.contains("aoede") || name.contains("kore") || name.contains("nova") ||
+                        v.features?.contains("female") == true
+                isUsOrEn && (isFemale || isNetworkOrNeural)
+            } ?: availableVoices?.firstOrNull { v ->
                 val name = v.name.lowercase()
                 val lang = v.locale?.language.orEmpty().lowercase()
                 val isFemale = name.contains("female") || name.contains("f0") || name.contains("sfg") ||
@@ -149,13 +178,51 @@ class VoiceAssistantRepository(
                 lang == "en" && !v.name.lowercase().contains("male")
             }
 
-            if (femaleVoice != null) {
-                tts?.voice = femaleVoice
-                Log.d(TAG, "Selected TTS Female Voice: ${femaleVoice.name}")
+            if (highQualityFemaleVoice != null) {
+                tts?.voice = highQualityFemaleVoice
+                Log.d(TAG, "Selected TTS Female Voice: ${highQualityFemaleVoice.name}")
             }
 
             tts?.setPitch(femaleVoiceConfig.pitch)
             tts?.setSpeechRate(femaleVoiceConfig.speed)
+
+            tts?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {
+                    _isSpeaking.value = true
+                }
+
+                override fun onDone(utteranceId: String?) {
+                    _isSpeaking.value = false
+                    stopWaveformAnimation()
+
+                    // If open mic is enabled and live voice session is active, automatically start listening hands-free
+                    if (_isOpenMicEnabled.value && _liveVoiceState.value != LiveVoiceSessionState.DISCONNECTED) {
+                        repoScope.launch {
+                            delay(350)
+                            if (!_isSpeaking.value && !_isProcessing.value) {
+                                startSpeechRecognition()
+                            }
+                        }
+                    }
+                }
+
+                @Deprecated("Deprecated in Java")
+                override fun onError(utteranceId: String?) {
+                    _isSpeaking.value = false
+                    stopWaveformAnimation()
+                    if (_isOpenMicEnabled.value && _liveVoiceState.value != LiveVoiceSessionState.DISCONNECTED) {
+                        scheduleAutoRestartListening(800)
+                    }
+                }
+
+                override fun onError(utteranceId: String?, errorCode: Int) {
+                    _isSpeaking.value = false
+                    stopWaveformAnimation()
+                    if (_isOpenMicEnabled.value && _liveVoiceState.value != LiveVoiceSessionState.DISCONNECTED) {
+                        scheduleAutoRestartListening(800)
+                    }
+                }
+            })
         } catch (e: Exception) {
             Log.w(TAG, "Gemini female voice config exception: ${e.message}")
         }
@@ -166,12 +233,28 @@ class VoiceAssistantRepository(
         applyFemaleVoiceConfiguration()
     }
 
+    fun toggleOpenMic(enabled: Boolean) {
+        _isOpenMicEnabled.value = enabled
+        if (enabled) {
+            if (_liveVoiceState.value == LiveVoiceSessionState.DISCONNECTED) {
+                startLiveVoiceSession()
+            } else if (!_isSpeaking.value && !_isProcessing.value) {
+                startSpeechRecognition()
+            }
+        } else {
+            stopSpeechRecognition()
+        }
+    }
+
     fun greetUserOnOpen(force: Boolean = false) {
         if (force || !hasGreeted) {
             hasGreeted = true
+            _isOpenMicEnabled.value = true
+            startLiveVoiceSession()
+
             repoScope.launch {
                 delay(300)
-                speak("Hello! I'm Route Logic, your Gemini automotive diagnostic co-pilot. All vehicle systems are nominal.")
+                speak("Hi, I'm GPS Route Logic A.I.. How can I help today?")
             }
         }
     }
@@ -196,10 +279,14 @@ class VoiceAssistantRepository(
         if (isTtsReady && tts != null) {
             _isSpeaking.value = true
             startWaveformAnimation()
-            // Clean markdown syntax for clear spoken TTS output
+            // Clean emojis, symbols, and formatting for natural human-sounding conversation
             val spokenText = text
-                .replace(Regex("[*#_`>]"), "")
+                .replace(Regex("[\\p{So}\\p{Cn}]"), "") // Strip emoji icons
+                .replace("•", ", ")
+                .replace("|", ", ")
+                .replace(Regex("[*#_`>~]"), "")
                 .replace(Regex("http\\S+"), "online link")
+                .replace(Regex("\\s+"), " ")
                 .trim()
             tts?.speak(spokenText, TextToSpeech.QUEUE_FLUSH, null, "gps_voice_utterance")
         }
@@ -212,23 +299,34 @@ class VoiceAssistantRepository(
     }
 
     fun clearHistory() {
-        _messages.value = listOf(
-            ChatMessage(
+        repoScope.launch(Dispatchers.IO) {
+            chatDao.clearAllMessages()
+            val initial = ChatMessage(
                 id = UUID.randomUUID().toString(),
                 sender = ChatSender.ASSISTANT,
-                content = "Thread reset. Co-pilot is standing by with ${_selectedPersona.value.title}.",
+                content = "Hi, I'm GPS Route Logic A.I.. How can I help today?",
                 modelUsed = _selectedModel.value.displayName,
                 personaUsed = _selectedPersona.value.title
             )
-        )
+            chatDao.insertMessage(initial.toEntity())
+        }
     }
 
-    // Speech-To-Text (STT) Engine & RecognitionListener
+    fun deleteMessage(id: String) {
+        repoScope.launch(Dispatchers.IO) {
+            chatDao.deleteMessage(id)
+        }
+    }
+
+    // Speech-To-Text (STT) Engine & Wake Word Recognition ("Hey Logic")
     fun startSpeechRecognition(onResult: ((String) -> Unit)? = null) {
+        if (_isSpeaking.value || _isProcessing.value) return
+
         this.onSttCallback = onResult
         _sttError.value = null
         _sttTranscript.value = ""
         _isSttListening.value = true
+        _liveVoiceState.value = LiveVoiceSessionState.LISTENING
         startWaveformAnimation(highEnergy = true)
 
         repoScope.launch(Dispatchers.Main) {
@@ -239,12 +337,14 @@ class VoiceAssistantRepository(
 
                 speechRecognizer?.setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) {
-                        Log.d(TAG, "STT: Ready for speech")
-                        _sttTranscript.value = "Listening... Speak automotive command (e.g. 'Scan OBD codes' or 'Avoid potholes')"
+                        Log.d(TAG, "STT: Ready for speech (Open Mic Active - Wake word 'Hey Logic')")
+                        _sttTranscript.value = "Listening... (Say 'Hey Logic' or speak command)"
+                        _liveTranscript.value = "🎙️ Open Mic Active • Listening for 'Hey Logic' or any driving question..."
                     }
 
                     override fun onBeginningOfSpeech() {
                         Log.d(TAG, "STT: User began speaking")
+                        startWaveformAnimation(highEnergy = true)
                     }
 
                     override fun onRmsChanged(rmsdB: Float) {
@@ -263,20 +363,24 @@ class VoiceAssistantRepository(
                     override fun onError(error: Int) {
                         val errorMsg = when (error) {
                             SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
-                            SpeechRecognizer.ERROR_CLIENT -> "Speech recognition client error"
-                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "RECORD_AUDIO permission missing"
+                            SpeechRecognizer.ERROR_CLIENT -> "Speech recognition client ready"
+                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "RECORD_AUDIO permission needed for Live Open Mic"
                             SpeechRecognizer.ERROR_NETWORK -> "Network connection error for STT"
                             SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timed out"
-                            SpeechRecognizer.ERROR_NO_MATCH -> "No speech recognized. Try speaking again"
-                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Voice recognizer is busy"
+                            SpeechRecognizer.ERROR_NO_MATCH -> "No speech recognized"
+                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Voice recognizer resetting"
                             SpeechRecognizer.ERROR_SERVER -> "Server recognition error"
-                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input detected"
-                            else -> "Speech recognition error ($error)"
+                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Speech timeout (Waiting for 'Hey Logic')"
+                            else -> "Speech recognition status ($error)"
                         }
-                        Log.w(TAG, "STT Error: $errorMsg ($error)")
-                        _sttError.value = errorMsg
+                        Log.d(TAG, "STT Status: $errorMsg ($error)")
                         _isSttListening.value = false
                         stopWaveformAnimation()
+
+                        // If Open Mic is active, auto-restart listening for hands-free wake word recognition
+                        if (_isOpenMicEnabled.value && _liveVoiceState.value != LiveVoiceSessionState.DISCONNECTED && !_isSpeaking.value && !_isProcessing.value) {
+                            scheduleAutoRestartListening(1000)
+                        }
                     }
 
                     override fun onResults(results: Bundle?) {
@@ -288,13 +392,9 @@ class VoiceAssistantRepository(
 
                         if (text.isNotBlank()) {
                             _sttTranscript.value = text
-                            if (onSttCallback != null) {
-                                onSttCallback?.invoke(text)
-                            } else {
-                                repoScope.launch {
-                                    sendQuery(userText = text, isVoice = true)
-                                }
-                            }
+                            handleRecognizedVoiceInput(text)
+                        } else if (_isOpenMicEnabled.value && _liveVoiceState.value != LiveVoiceSessionState.DISCONNECTED) {
+                            scheduleAutoRestartListening(800)
                         }
                     }
 
@@ -303,6 +403,18 @@ class VoiceAssistantRepository(
                         val partial = matches?.firstOrNull()?.trim()
                         if (!partial.isNullOrBlank()) {
                             _sttTranscript.value = partial
+                            _liveTranscript.value = "\"$partial\""
+
+                            // Early Wake Word Check on partial stream
+                            if (wakeWordRegex.containsMatchIn(partial)) {
+                                _wakeWordDetected.value = "Hey Logic"
+                                repoScope.launch {
+                                    delay(4000)
+                                    if (_wakeWordDetected.value == "Hey Logic") {
+                                        _wakeWordDetected.value = null
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -314,20 +426,74 @@ class VoiceAssistantRepository(
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
                     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                     putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Scan OBD codes, engine status, or route directions...")
+                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Say 'Hey Logic', check OBD codes, or ask route directions...")
                 }
 
                 speechRecognizer?.startListening(recognizerIntent)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start speech recognition: ${e.message}", e)
-                _sttError.value = "Speech recognition unavailable: ${e.message}"
+                _sttError.value = "Speech recognition error: ${e.message}"
                 _isSttListening.value = false
                 stopWaveformAnimation()
             }
         }
     }
 
+    private fun handleRecognizedVoiceInput(rawText: String) {
+        val hasWakeWord = wakeWordRegex.containsMatchIn(rawText)
+        if (hasWakeWord) {
+            _wakeWordDetected.value = "Hey Logic"
+            repoScope.launch {
+                delay(4000)
+                if (_wakeWordDetected.value == "Hey Logic") {
+                    _wakeWordDetected.value = null
+                }
+            }
+        }
+
+        // Clean wake word prefix if present (e.g. "Hey Logic, scan engine codes" -> "scan engine codes")
+        val strippedText = rawText.replace(wakeWordPrefixCleanRegex, "").trim()
+
+        if (onSttCallback != null) {
+            onSttCallback?.invoke(rawText)
+            return
+        }
+
+        // If user said only "Hey Logic" without extra words:
+        if (hasWakeWord && (strippedText.isBlank() || strippedText.equals("hey", ignoreCase = true))) {
+            _liveVoiceState.value = LiveVoiceSessionState.SPEAKING
+            _liveTranscript.value = "⚡ 'Hey Logic' detected! I'm listening..."
+            speak("Hi, I'm GPS Route Logic A.I.. How can I help today?")
+            return
+        }
+
+        val promptToSend = if (strippedText.isNotBlank()) strippedText else rawText
+        _liveTranscript.value = "\"$rawText\""
+        _liveVoiceState.value = LiveVoiceSessionState.PROCESSING
+
+        repoScope.launch {
+            sendQuery(userText = promptToSend, isVoice = true)
+            _liveVoiceState.value = LiveVoiceSessionState.CONNECTED_IDLE
+        }
+    }
+
+    private fun scheduleAutoRestartListening(delayMs: Long) {
+        restartListeningJob?.cancel()
+        restartListeningJob = repoScope.launch {
+            delay(delayMs)
+            if (_isOpenMicEnabled.value &&
+                _liveVoiceState.value != LiveVoiceSessionState.DISCONNECTED &&
+                !_isSpeaking.value &&
+                !_isProcessing.value &&
+                !_isSttListening.value
+            ) {
+                startSpeechRecognition()
+            }
+        }
+    }
+
     fun stopSpeechRecognition() {
+        restartListeningJob?.cancel()
         repoScope.launch(Dispatchers.Main) {
             try {
                 speechRecognizer?.stopListening()
@@ -340,6 +506,7 @@ class VoiceAssistantRepository(
     }
 
     fun cancelSpeechRecognition() {
+        restartListeningJob?.cancel()
         repoScope.launch(Dispatchers.Main) {
             try {
                 speechRecognizer?.cancel()
@@ -353,68 +520,79 @@ class VoiceAssistantRepository(
     }
 
     // Live Voice Session Controls (gemini-3.1-flash-live-preview)
-    fun startLiveVoiceSession() {
+    fun startLiveVoiceSession(autoListen: Boolean = true) {
         _liveVoiceState.value = LiveVoiceSessionState.CONNECTING
         _selectedModel.value = GeminiAiModel.LIVE_VOICE
         startWaveformAnimation()
 
         repoScope.launch {
-            delay(800) // Connection handshake with Gemini Live API
+            delay(400) // Fast handshake with Gemini Live API
             _liveVoiceState.value = LiveVoiceSessionState.CONNECTED_IDLE
-            _liveTranscript.value = "Gemini Live Co-Pilot Connected (Voice: ${_selectedFemaleVoice.value.displayName}). Tap microphone to speak..."
+            _liveTranscript.value = "Hi, I'm GPS Route Logic A.I.. How can I help today?"
+
+            if (autoListen && _isOpenMicEnabled.value && !_isSpeaking.value) {
+                delay(300)
+                startSpeechRecognition()
+            }
         }
     }
 
     fun stopLiveVoiceSession() {
+        restartListeningJob?.cancel()
+        _isOpenMicEnabled.value = false
         _liveVoiceState.value = LiveVoiceSessionState.DISCONNECTED
         stopSpeaking()
+        stopSpeechRecognition()
         stopWaveformAnimation()
         _liveTranscript.value = ""
     }
 
     fun startListeningLive() {
-        if (_liveVoiceState.value != LiveVoiceSessionState.DISCONNECTED) {
-            _liveVoiceState.value = LiveVoiceSessionState.LISTENING
-            _liveTranscript.value = "Listening to your automotive voice command..."
-            startWaveformAnimation(highEnergy = true)
-            startSpeechRecognition { recognizedVoiceText ->
-                _liveTranscript.value = "\"$recognizedVoiceText\""
-                _liveVoiceState.value = LiveVoiceSessionState.PROCESSING
-                repoScope.launch {
-                    sendQuery(userText = recognizedVoiceText, isVoice = true)
-                    _liveVoiceState.value = LiveVoiceSessionState.CONNECTED_IDLE
-                }
-            }
+        if (_liveVoiceState.value == LiveVoiceSessionState.DISCONNECTED) {
+            startLiveVoiceSession(autoListen = true)
+        } else {
+            startSpeechRecognition()
         }
     }
 
     fun stopListeningAndSend(simulatedVoiceText: String? = null) {
-        if (_liveVoiceState.value == LiveVoiceSessionState.DISCONNECTED) return
+        if (_liveVoiceState.value == LiveVoiceSessionState.DISCONNECTED) {
+            startLiveVoiceSession(autoListen = false)
+        }
 
         stopSpeechRecognition()
         val prompt = if (!simulatedVoiceText.isNullOrBlank()) {
             simulatedVoiceText
         } else {
-            "Scan OBD-II codes and check engine health"
+            "Hey Logic, scan OBD-II codes and check engine health"
         }
 
         _liveVoiceState.value = LiveVoiceSessionState.PROCESSING
         _liveTranscript.value = "\"$prompt\""
 
         repoScope.launch {
-            sendQuery(userText = prompt, isVoice = true)
+            val cleanPrompt = prompt.replace(wakeWordPrefixCleanRegex, "").trim()
+            sendQuery(userText = if (cleanPrompt.isNotBlank()) cleanPrompt else prompt, isVoice = true)
             _liveVoiceState.value = LiveVoiceSessionState.CONNECTED_IDLE
         }
     }
 
     suspend fun sendQuery(userText: String, isVoice: Boolean = false): GeminiGenerationResult {
         _isProcessing.value = true
+        restartListeningJob?.cancel()
 
         // Record quota usage
         val hasQuota = authManager.recordChatUsage()
         if (!hasQuota) {
             _isProcessing.value = false
-            val limitMsg = "Daily AI Chat allowance reached. Upgrade to PRO for unlimited Live Gemini voice conversations and ELM327 diagnostics."
+            val currentTier = authManager.currentUser.value.tier
+            val limitMsg = "Daily real-time live-chat allowance reached (${currentTier.chatTokensPerDay} daily sessions on ${currentTier.title}). Upgrade to Premium ($4.99/mo for 35 daily sessions) or PRO ($8.99/mo for Unlimited real-time Gemini chat)."
+            val userMsg = ChatMessage(
+                id = UUID.randomUUID().toString(),
+                sender = ChatSender.USER,
+                content = userText,
+                isVoice = isVoice
+            )
             val assistantMsg = ChatMessage(
                 id = UUID.randomUUID().toString(),
                 sender = ChatSender.ASSISTANT,
@@ -424,12 +602,8 @@ class VoiceAssistantRepository(
                 modelUsed = _selectedModel.value.displayName,
                 personaUsed = _selectedPersona.value.title
             )
-            _messages.value = _messages.value + ChatMessage(
-                id = UUID.randomUUID().toString(),
-                sender = ChatSender.USER,
-                content = userText,
-                isVoice = isVoice
-            ) + assistantMsg
+            chatDao.insertMessage(userMsg.toEntity())
+            chatDao.insertMessage(assistantMsg.toEntity())
             return GeminiGenerationResult(text = limitMsg, modelUsed = _selectedModel.value.displayName)
         }
 
@@ -439,7 +613,7 @@ class VoiceAssistantRepository(
             content = userText,
             isVoice = isVoice
         )
-        _messages.value = _messages.value + userMessage
+        chatDao.insertMessage(userMessage.toEntity())
 
         val currentTelemetryContext = telemetryContextProvider?.invoke()
 
@@ -465,7 +639,7 @@ class VoiceAssistantRepository(
             groundedPlaces = result.mapPlaces,
             searchQueries = result.searchQueries
         )
-        _messages.value = _messages.value + assistantMessage
+        chatDao.insertMessage(assistantMessage.toEntity())
         _isProcessing.value = false
 
         if (isVoice) {
@@ -494,6 +668,7 @@ class VoiceAssistantRepository(
     }
 
     fun cleanup() {
+        restartListeningJob?.cancel()
         waveformJob?.cancel()
         try {
             speechRecognizer?.destroy()

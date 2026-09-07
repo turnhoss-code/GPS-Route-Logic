@@ -8,12 +8,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,6 +24,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import com.example.R
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,10 +42,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.filled.GraphicEq
@@ -53,8 +61,14 @@ import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.VolumeUp
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
+import java.text.SimpleDateFormat
+import java.util.Date
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -130,9 +144,12 @@ fun VoiceCopilotScreen(
     val isSttListening by viewModel.isSttListening.collectAsState()
     val sttTranscript by viewModel.sttTranscript.collectAsState()
     val sttError by viewModel.sttError.collectAsState()
+    val isOpenMicEnabled by viewModel.isOpenMicEnabled.collectAsState()
+    val wakeWordDetected by viewModel.wakeWordDetected.collectAsState()
 
     var textInput by remember { mutableStateOf("") }
-    var selectedCopilotMode by remember { mutableIntStateOf(0) } // 0: Multi-Turn Chat, 1: Live Voice API
+    var selectedCopilotMode by remember { mutableIntStateOf(1) } // 0: Multi-Turn Chat, 1: Live Voice API (Default to Live Voice)
+    var showManualSttDialog by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
     // Permission launcher for Speech Recognition
@@ -140,7 +157,9 @@ fun VoiceCopilotScreen(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
+            showManualSttDialog = true
             viewModel.startSpeechToText { recognizedText ->
+                showManualSttDialog = false
                 viewModel.sendChatMessage(recognizedText, isVoice = true)
             }
         }
@@ -148,12 +167,12 @@ fun VoiceCopilotScreen(
 
     val quickPrompts = listOf(
         "Scan OBD codes from ELM327 BLE ⚡",
-        "Recommend alternate route to avoid potholes & mitigate damage 🛡️",
-        "What is my vehicle info, condition & coolant temp? 🚗",
-        "Weather impact & road grip conditions on route 🌧️",
-        "GPS turn-by-turn directions to Silicon Valley Hub 🗺️",
+        "Recommend alternate route based on damage score & trip logs 🛡️",
+        "What is my current engine status & coolant temp? 🚗",
+        "Current location GPS directions & traffic detours 📍",
         "Explain DTC P0300 misfire cause & estimated repair cost 🔧",
-        "Clear Check Engine Light & reset ECU ⚠️"
+        "Explain DTC P0420 catalyst efficiency & fix 🛠️",
+        "Analyze trip logs & road surface wear scores 📊"
     )
 
     LaunchedEffect(messages.size) {
@@ -162,10 +181,13 @@ fun VoiceCopilotScreen(
         }
     }
 
-    // Speech-To-Text (STT) Active Listening Dialog
-    if (isSttListening) {
+    // Speech-To-Text (STT) Manual Listening Dialog (only when manually triggered in Multi-Turn tab)
+    if (showManualSttDialog && isSttListening && selectedCopilotMode == 0) {
         AlertDialog(
-            onDismissRequest = { viewModel.cancelSpeechToText() },
+            onDismissRequest = {
+                showManualSttDialog = false
+                viewModel.cancelSpeechToText()
+            },
             containerColor = Color(0xFF0E1A38),
             titleContentColor = Color.White,
             textContentColor = Color.White,
@@ -232,6 +254,7 @@ fun VoiceCopilotScreen(
             confirmButton = {
                 Button(
                     onClick = {
+                        showManualSttDialog = false
                         viewModel.stopSpeechToText()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = SpeedGreen),
@@ -242,7 +265,10 @@ fun VoiceCopilotScreen(
             },
             dismissButton = {
                 OutlinedButton(
-                    onClick = { viewModel.cancelSpeechToText() },
+                    onClick = {
+                        showManualSttDialog = false
+                        viewModel.cancelSpeechToText()
+                    },
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF8D99AE))
                 ) {
                     Text("Cancel")
@@ -251,12 +277,34 @@ fun VoiceCopilotScreen(
         )
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color(0xFF070B19))
+    Box(
+        modifier = modifier.fillMaxSize()
     ) {
-        // Mode Header Tabs
+        // Cockpit Holographic Diagnostic Backdrop
+        Image(
+            painter = painterResource(id = R.drawable.drive_logic_ai_developer_header),
+            contentDescription = "DriveLogic AI Cockpit Backdrop",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        // High-contrast gradient scrim to ensure complete legibility for chat, buttons, and telemetry
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF070B19).copy(alpha = 0.82f),
+                            Color(0xFF0A1128).copy(alpha = 0.94f)
+                        )
+                    )
+                )
+        )
+
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Mode Header Tabs
         TabRow(
             selectedTabIndex = selectedCopilotMode,
             containerColor = Color(0xFF0B132B),
@@ -311,7 +359,9 @@ fun VoiceCopilotScreen(
                 waveformEnergy = waveformEnergy,
                 liveTranscript = liveTranscript,
                 isSpeaking = isSpeaking,
-                isProcessing = isProcessing
+                isProcessing = isProcessing,
+                isOpenMicEnabled = isOpenMicEnabled,
+                wakeWordDetected = wakeWordDetected
             )
         } else {
             // Multi-Turn Chatbot Screen
@@ -333,7 +383,9 @@ fun VoiceCopilotScreen(
                     ) == PackageManager.PERMISSION_GRANTED
 
                     if (hasRecordPerm) {
+                        showManualSttDialog = true
                         viewModel.startSpeechToText { recognizedText ->
+                            showManualSttDialog = false
                             viewModel.sendChatMessage(recognizedText, isVoice = true)
                         }
                     } else {
@@ -352,6 +404,7 @@ fun VoiceCopilotScreen(
             )
         }
     }
+}
 }
 
 @Composable
@@ -386,13 +439,40 @@ fun MultiTurnChatbotView(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = "ROLE PERSONA",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF8D99AE),
-                        letterSpacing = 1.sp
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "ROLE PERSONA",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF8D99AE),
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            color = Color(0xFF162544),
+                            shape = RoundedCornerShape(4.dp),
+                            border = BorderStroke(0.5.dp, Color(0xFF2E467C))
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Storage,
+                                    contentDescription = null,
+                                    tint = NeonCyan,
+                                    modifier = Modifier.size(10.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "Room DB Synced",
+                                    fontSize = 9.sp,
+                                    color = NeonCyan,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
                     IconButton(
                         onClick = { viewModel.clearChatHistory() },
                         modifier = Modifier.size(28.dp).testTag("clear_chat_button")
@@ -502,7 +582,7 @@ fun MultiTurnChatbotView(
                         onClick = { viewModel.playFemaleVoicePreview(currentFemaleVoice) },
                         modifier = Modifier.size(24.dp).testTag("preview_female_voice_button")
                     ) {
-                        Icon(Icons.Default.VolumeUp, contentDescription = "Test Female Voice", tint = NeonCyan, modifier = Modifier.size(16.dp))
+                        Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Test Female Voice", tint = NeonCyan, modifier = Modifier.size(16.dp))
                     }
                 }
 
@@ -517,7 +597,7 @@ fun MultiTurnChatbotView(
                             onClick = { viewModel.setFemaleVoice(voice) },
                             label = { Text(voice.displayName, fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
                             leadingIcon = {
-                                Icon(Icons.Default.VolumeUp, contentDescription = null, modifier = Modifier.size(13.dp), tint = if (isSelected) SpeedGreen else Color(0xFF8D99AE))
+                                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, modifier = Modifier.size(13.dp), tint = if (isSelected) SpeedGreen else Color(0xFF8D99AE))
                             },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = SpeedGreen.copy(alpha = 0.2f),
@@ -624,7 +704,18 @@ fun MultiTurnChatbotView(
             item { Spacer(modifier = Modifier.height(8.dp)) }
 
             items(messages, key = { it.id }) { message ->
-                ChatMessageBubble(message = message, onPlayTts = { viewModel.voiceRepo.speak(it) })
+                val context = LocalContext.current
+                ChatMessageBubble(
+                    message = message,
+                    onPlayTts = { viewModel.voiceRepo.speak(it) },
+                    onDelete = { viewModel.deleteChatMessage(message.id) },
+                    onCopy = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = ClipData.newPlainText("Copilot Message", message.content)
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                    }
+                )
             }
 
             if (isProcessing) {
@@ -765,10 +856,20 @@ fun MultiTurnChatbotView(
 @Composable
 fun ChatMessageBubble(
     message: ChatMessage,
-    onPlayTts: (String) -> Unit
+    onPlayTts: (String) -> Unit,
+    onDelete: () -> Unit,
+    onCopy: () -> Unit
 ) {
     val isUser = message.sender == ChatSender.USER
     val context = LocalContext.current
+    val timeFormatted = remember(message.timestamp) {
+        try {
+            val sdf = SimpleDateFormat("h:mm a", java.util.Locale.getDefault())
+            sdf.format(Date(message.timestamp))
+        } catch (_: Exception) {
+            ""
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -787,6 +888,22 @@ fun ChatMessageBubble(
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = NeonCyan
+                )
+                if (timeFormatted.isNotEmpty()) {
+                    Text(
+                        text = " • $timeFormatted",
+                        fontSize = 9.sp,
+                        color = Color(0xFF8D99AE)
+                    )
+                }
+            }
+        } else {
+            if (timeFormatted.isNotEmpty()) {
+                Text(
+                    text = timeFormatted,
+                    fontSize = 9.sp,
+                    color = Color(0xFF8D99AE),
+                    modifier = Modifier.padding(bottom = 2.dp, end = 4.dp)
                 )
             }
         }
@@ -893,23 +1010,52 @@ fun ChatMessageBubble(
                     }
                 }
 
-                // Audio Playback button for Assistant
-                if (!isUser) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                        horizontalArrangement = Arrangement.End
+                // Action Toolbar (Copy, TTS, Delete)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = onCopy,
+                        modifier = Modifier.size(24.dp)
                     ) {
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = "Copy text",
+                            tint = Color(0xFF8D99AE),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+
+                    if (!isUser) {
+                        Spacer(modifier = Modifier.width(4.dp))
                         IconButton(
                             onClick = { onPlayTts(message.content) },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
-                                Icons.Default.VolumeUp,
+                                Icons.AutoMirrored.Filled.VolumeUp,
                                 contentDescription = "Read Aloud",
                                 tint = Color(0xFF8D99AE),
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
                         }
+                    }
+
+                    Spacer(modifier = Modifier.width(4.dp))
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete Message",
+                            tint = Color(0xFF8D99AE).copy(alpha = 0.7f),
+                            modifier = Modifier.size(14.dp)
+                        )
                     }
                 }
             }
@@ -924,7 +1070,9 @@ fun LiveVoiceCopilotView(
     waveformEnergy: Float,
     liveTranscript: String,
     isSpeaking: Boolean,
-    isProcessing: Boolean
+    isProcessing: Boolean,
+    isOpenMicEnabled: Boolean,
+    wakeWordDetected: String?
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "live_wave")
     val pulseScale by infiniteTransition.animateFloat(
@@ -937,6 +1085,38 @@ fun LiveVoiceCopilotView(
         label = "pulse"
     )
 
+    val isListeningForWakeWord = isOpenMicEnabled || liveVoiceState == LiveVoiceSessionState.LISTENING || wakeWordDetected != null
+
+    // Multi-phase continuous visual ripple animation around mic icon when listening for wake word 'Hey Logic'
+    val rippleTransition = rememberInfiniteTransition(label = "wake_word_ripple")
+    val ripple1 by rippleTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ripple1"
+    )
+    val ripple2 by rippleTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2400, delayMillis = 800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ripple2"
+    )
+    val ripple3 by rippleTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2400, delayMillis = 1600, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ripple3"
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -944,63 +1124,166 @@ fun LiveVoiceCopilotView(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Model Banner
+        // Model & Open Mic / Wake Word Status Banner
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF0E1A38)),
-            border = BorderStroke(1.dp, Color(0xFF263868)),
+            border = BorderStroke(1.dp, if (isOpenMicEnabled) SpeedGreen.copy(alpha = 0.6f) else Color(0xFF263868)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
-                modifier = Modifier.padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .background(if (liveVoiceState != LiveVoiceSessionState.DISCONNECTED) SpeedGreen else Color.Red, CircleShape)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text(
-                        text = "LIVE VOICE API ACTIVE",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = SpeedGreen,
-                        letterSpacing = 1.sp
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(
+                                if (liveVoiceState != LiveVoiceSessionState.DISCONNECTED && isOpenMicEnabled) SpeedGreen else NeonCyan,
+                                CircleShape
+                            )
                     )
-                    Text(
-                        text = "Model: gemini-3.1-flash-live-preview",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "WAKE WORD: ",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF8D99AE),
+                                letterSpacing = 0.8.sp
+                            )
+                            Surface(
+                                color = NeonCyan.copy(alpha = 0.18f),
+                                shape = RoundedCornerShape(4.dp),
+                                border = BorderStroke(0.5.dp, NeonCyan)
+                            ) {
+                                Text(
+                                    text = "“Hey Logic”",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = NeonCyan,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
+                        Text(
+                            text = "Model: gemini-3.1-flash-live-preview",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                // Open Mic Toggle
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { viewModel.toggleOpenMic(!isOpenMicEnabled) }
+                        .padding(4.dp)
+                        .testTag("toggle_open_mic_switch")
+                ) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = if (isOpenMicEnabled) "Open Mic ON" else "Mic Muted",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isOpenMicEnabled) SpeedGreen else Color(0xFF8D99AE)
+                        )
+                        Text(
+                            text = "Hands-free",
+                            fontSize = 8.sp,
+                            color = Color(0xFF8D99AE)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Switch(
+                        checked = isOpenMicEnabled,
+                        onCheckedChange = { viewModel.toggleOpenMic(it) },
+                        modifier = Modifier.size(24.dp),
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = SpeedGreen,
+                            checkedTrackColor = SpeedGreen.copy(alpha = 0.3f)
+                        )
                     )
                 }
             }
         }
 
-        // Visualizer / Waveform Centerpiece
+        // Wake Word Active Notification Pill (when detected)
+        if (wakeWordDetected != null) {
+            Surface(
+                color = SpeedGreen.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, SpeedGreen),
+                modifier = Modifier.padding(vertical = 4.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = SpeedGreen, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("⚡ Wake Word 'Hey Logic' Activated", fontSize = 11.sp, color = SpeedGreen, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // Visualizer / Waveform Centerpiece with Visual Ripple Animation
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(vertical = 24.dp)
+            modifier = Modifier.padding(vertical = 12.dp)
         ) {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.size(180.dp)
+                modifier = Modifier
+                    .size(230.dp)
+                    .testTag("wake_word_mic_ripple_container")
             ) {
-                // Outer Pulse Ring
-                Box(
-                    modifier = Modifier
-                        .size((140 * (1f + (waveformEnergy * 0.35f))).dp)
-                        .background(
-                            brush = Brush.radialGradient(
-                                listOf(
-                                    SpeedGreen.copy(alpha = 0.3f),
-                                    Color.Transparent
+                // Expanding Concentric Ripple Rings when listening for 'Hey Logic'
+                if (isListeningForWakeWord) {
+                    val rippleRings = listOf(ripple1, ripple2, ripple3)
+                    val isWakeHeard = wakeWordDetected != null
+                    val primaryRippleColor = if (isWakeHeard) SpeedGreen else NeonCyan
+                    val secondaryRippleColor = if (isWakeHeard) GoldPro else ElectricBlue
+
+                    rippleRings.forEach { progress ->
+                        val ringSize = (84 + (progress * 136)).dp
+                        val ringAlpha = ((1f - progress) * 0.85f).coerceIn(0f, 1f)
+                        val strokeWidth = (2.6f - (progress * 1.5f)).coerceAtLeast(0.8f).dp
+
+                        Box(
+                            modifier = Modifier
+                                .size(ringSize)
+                                .background(
+                                    brush = Brush.radialGradient(
+                                        listOf(
+                                            primaryRippleColor.copy(alpha = ringAlpha * 0.22f),
+                                            secondaryRippleColor.copy(alpha = ringAlpha * 0.05f),
+                                            Color.Transparent
+                                        )
+                                    ),
+                                    shape = CircleShape
                                 )
-                            ),
-                            shape = CircleShape
+                                .border(
+                                    width = strokeWidth,
+                                    brush = Brush.sweepGradient(
+                                        listOf(
+                                            primaryRippleColor.copy(alpha = ringAlpha),
+                                            secondaryRippleColor.copy(alpha = ringAlpha),
+                                            primaryRippleColor.copy(alpha = ringAlpha)
+                                        )
+                                    ),
+                                    shape = CircleShape
+                                )
                         )
-                )
+                    }
+                }
 
                 // Mid Waveform Ring
                 Box(
@@ -1008,7 +1291,12 @@ fun LiveVoiceCopilotView(
                         .size((110 * (1f + (waveformEnergy * 0.2f))).dp)
                         .border(
                             2.dp,
-                            brush = Brush.sweepGradient(listOf(SpeedGreen, NeonCyan, ElectricBlue, SpeedGreen)),
+                            brush = Brush.sweepGradient(
+                                if (wakeWordDetected != null)
+                                    listOf(GoldPro, SpeedGreen, NeonCyan, GoldPro)
+                                else
+                                    listOf(SpeedGreen, NeonCyan, ElectricBlue, SpeedGreen)
+                            ),
                             shape = CircleShape
                         )
                 )
@@ -1020,7 +1308,11 @@ fun LiveVoiceCopilotView(
                         .size(80.dp)
                         .background(
                             brush = Brush.linearGradient(
-                                if (isSpeaking) listOf(SpeedGreen, NeonCyan) else listOf(ElectricBlue, NeonCyan)
+                                when {
+                                    wakeWordDetected != null -> listOf(GoldPro, SpeedGreen)
+                                    isSpeaking -> listOf(SpeedGreen, NeonCyan)
+                                    else -> listOf(ElectricBlue, NeonCyan)
+                                }
                             ),
                             shape = CircleShape
                         )
@@ -1034,7 +1326,7 @@ fun LiveVoiceCopilotView(
                         .testTag("live_voice_orb_button")
                 ) {
                     Icon(
-                        imageVector = if (isSpeaking) Icons.Default.VolumeUp else Icons.Default.Mic,
+                        imageVector = if (isSpeaking) Icons.AutoMirrored.Filled.VolumeUp else Icons.Default.Mic,
                         contentDescription = "Live Voice Orb",
                         tint = Color.Black,
                         modifier = Modifier.size(36.dp)
@@ -1042,22 +1334,56 @@ fun LiveVoiceCopilotView(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Visual Ripple Feedback Badge for 'Hey Logic'
+            if (isListeningForWakeWord) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = (if (wakeWordDetected != null) SpeedGreen else NeonCyan).copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, if (wakeWordDetected != null) SpeedGreen else NeonCyan)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(if (wakeWordDetected != null) SpeedGreen else NeonCyan)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (wakeWordDetected != null)
+                                "⚡ 'Hey Logic' Recognized! Speak your command..."
+                            else
+                                "👂 Listening for Wake Word: 'Hey Logic'",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (wakeWordDetected != null) SpeedGreen else NeonCyan
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
 
             Text(
-                text = when (liveVoiceState) {
-                    LiveVoiceSessionState.CONNECTING -> "Handshaking with Gemini Live Preview..."
-                    LiveVoiceSessionState.LISTENING -> "Listening to speech... (Tap orb to finish)"
-                    LiveVoiceSessionState.PROCESSING -> "Gemini Live synthesizing audio response..."
-                    LiveVoiceSessionState.SPEAKING -> "Co-Pilot is speaking..."
-                    LiveVoiceSessionState.CONNECTED_IDLE -> "Connected & Ready • Tap Mic to Speak"
+                text = when {
+                    isSpeaking -> "GPS Route Logic A.I. is speaking..."
+                    isProcessing -> "Gemini Live synthesizing vehicle response..."
+                    liveVoiceState == LiveVoiceSessionState.LISTENING -> "🎙️ Open Mic Active • Speak or say 'Hey Logic'..."
+                    isOpenMicEnabled -> "👂 Open Mic Ready • Say 'Hey Logic' or tap orb"
+                    liveVoiceState == LiveVoiceSessionState.CONNECTED_IDLE -> "Connected & Ready • Tap Mic to Speak"
                     else -> "Live session disconnected"
                 },
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = when (liveVoiceState) {
-                    LiveVoiceSessionState.LISTENING -> NeonCyan
-                    LiveVoiceSessionState.SPEAKING -> SpeedGreen
+                color = when {
+                    isSpeaking -> SpeedGreen
+                    liveVoiceState == LiveVoiceSessionState.LISTENING -> NeonCyan
                     else -> Color.White
                 }
             )
@@ -1090,7 +1416,7 @@ fun LiveVoiceCopilotView(
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = if (liveTranscript.isNotBlank()) liveTranscript else "Say 'Hey GPS', 'Check engine diagnostics', or 'What's the best route to the airport?'",
+                    text = if (liveTranscript.isNotBlank()) liveTranscript else "Say 'Hey Logic', 'Check engine diagnostics', or 'What's the best route?'",
                     fontSize = 13.sp,
                     color = if (liveTranscript.isNotBlank()) Color.White else Color(0xFF6B7280),
                     lineHeight = 18.sp
@@ -1098,12 +1424,12 @@ fun LiveVoiceCopilotView(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Quick Simulated Voice Scenarios
+        // Quick Simulated Voice Scenarios with 'Hey Logic'
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
-                "QUICK VOICE CO-PILOT SIMULATIONS:",
+                "QUICK 'HEY LOGIC' SCENARIOS:",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF8D99AE),
@@ -1115,24 +1441,34 @@ fun LiveVoiceCopilotView(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedButton(
-                    onClick = { viewModel.stopListeningAndSend("What is my current engine status?") },
+                    onClick = { viewModel.stopListeningAndSend("Hey Logic, what is my current engine status and coolant temperature?") },
                     modifier = Modifier.weight(1f).testTag("quick_voice_engine_status"),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonCyan)
                 ) {
-                    Text("Engine Status 🚗", fontSize = 11.sp)
+                    Text("Hey Logic: Engine 🚗", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
 
                 OutlinedButton(
-                    onClick = { viewModel.stopListeningAndSend("Hey Route Logic, check engine error codes and battery voltage.") },
+                    onClick = { viewModel.stopListeningAndSend("Hey Logic, scan OBD-II diagnostic fault codes and check battery voltage.") },
                     modifier = Modifier.weight(1f).testTag("quick_voice_diagnostics"),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = SpeedGreen)
                 ) {
-                    Text("OBD-II Scan ⚠️", fontSize = 11.sp)
+                    Text("Hey Logic: OBD-II ⚠️", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            OutlinedButton(
+                onClick = { viewModel.stopListeningAndSend("Hey Logic, recommend alternate route based on damage score and trip logs.") },
+                modifier = Modifier.fillMaxWidth().testTag("quick_voice_alternate_route"),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = GoldPro)
+            ) {
+                Text("Hey Logic: Recommend Alternate Route 🛡️", fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Controls Bottom Bar
         Row(
@@ -1154,7 +1490,7 @@ fun LiveVoiceCopilotView(
                 modifier = Modifier.weight(1f).testTag("live_voice_toggle_session_button")
             ) {
                 Text(
-                    if (liveVoiceState != LiveVoiceSessionState.DISCONNECTED) "Disconnect Live Session" else "Connect Live Voice API",
+                    if (liveVoiceState != LiveVoiceSessionState.DISCONNECTED) "Disconnect Live Session" else "Connect Live Voice API (Open Mic)",
                     color = if (liveVoiceState != LiveVoiceSessionState.DISCONNECTED) Color.White else Color.Black,
                     fontWeight = FontWeight.Bold
                 )

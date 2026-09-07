@@ -57,10 +57,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         db.tripLogDao()
     )
     val routeRepo = RouteNavigationRepository(db.routeDao())
-    val voiceRepo = VoiceAssistantRepository(application, authManager)
+    val voiceRepo = VoiceAssistantRepository(application, authManager, db.chatDao())
 
-    // Current Tab
-    private val _currentTab = MutableStateFlow(AppTab.ROUTE)
+    // Current Tab - Default to Gemini Live Voice Chat on app start-up
+    private val _currentTab = MutableStateFlow(AppTab.VOICE)
     val currentTab: StateFlow<AppTab> = _currentTab.asStateFlow()
 
     // Auth & Quota
@@ -106,10 +106,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val showFreezeFrameModal: StateFlow<Boolean> = _showFreezeFrameModal.asStateFlow()
 
     // Route & Traffic State
-    private val _originInput = MutableStateFlow("Downtown Financial District")
+    private val _originInput = MutableStateFlow("")
     val originInput: StateFlow<String> = _originInput.asStateFlow()
 
-    private val _destinationInput = MutableStateFlow("Metro Tech Park, Bay Area")
+    private val _destinationInput = MutableStateFlow("")
     val destinationInput: StateFlow<String> = _destinationInput.asStateFlow()
 
     private val _routeOptions = MutableStateFlow<List<RouteOption>>(emptyList())
@@ -145,10 +145,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val isVoiceSpeaking: StateFlow<Boolean> = voiceRepo.isSpeaking
     val isChatProcessing: StateFlow<Boolean> = voiceRepo.isProcessing
 
-    // Speech-To-Text (STT) States
+    // Speech-To-Text (STT) & Open Mic / Wake Word States
     val isSttListening: StateFlow<Boolean> = voiceRepo.isSttListening
     val sttTranscript: StateFlow<String> = voiceRepo.sttTranscript
     val sttError: StateFlow<String?> = voiceRepo.sttError
+    val isOpenMicEnabled: StateFlow<Boolean> = voiceRepo.isOpenMicEnabled
+    val wakeWordDetected: StateFlow<String?> = voiceRepo.wakeWordDetected
 
     // Ad Simulation
     private val _showAdRewardDialog = MutableStateFlow(false)
@@ -189,35 +191,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         // Init vehicle profile if none exists
         viewModelScope.launch {
-            db.vehicleDao().insertVehicle(
-                VehicleProfile(
-                    nickname = "Primary Commuter",
-                    year = 2024,
-                    make = "Honda",
-                    model = "Accord",
-                    trim = "Touring Elite Edition",
-                    vin = "1HGCV1F34PA092811",
-                    engine = "2.0L Turbo 4-Cyl DOHC 16V",
-                    size = "Mid-Size Sedan (196.1″ L × 73.3″ W × 57.1″ H)",
-                    bodyType = "4-Door Sedan / 5-Passenger",
-                    transmission = "10-Speed Electronic Sport Automatic",
-                    driveType = "Intelligent All-Wheel Drive (AWD)",
-                    horsepower = "252 hp @ 6,500 RPM",
-                    torque = "273 lb-ft @ 1,500–4,000 RPM",
-                    fuelType = "Gasoline (Premium 91+ Unleaded)",
-                    tankCapacity = "14.8 Gallons (~470 mi Range)",
-                    curbWeight = "3,528 lbs (GVWR: 4,560 lbs)",
-                    tireSpec = "235/40R19 96V (33 PSI Cold)",
-                    towingCapacity = "1,500 lbs max",
-                    obdProtocol = "ISO 15765-4 CAN (11-bit / 500 kbaud)",
-                    ecuFirmware = "ECU-CAL-v4.8.2-HON",
-                    oilSpec = "0W-20 Full Synthetic (4.4 qt)",
-                    coolantSpec = "OEM Long Life Type 2 (6.8 qt)",
-                    brakeFluidSpec = "DOT 4 Heavy Duty Synthetic",
-                    mileage = 45200,
-                    isDefault = true
+            if (db.vehicleDao().getVehicleCount() == 0) {
+                db.vehicleDao().insertVehicle(
+                    VehicleProfile(
+                        nickname = "My Vehicle",
+                        year = 2024,
+                        make = "Vehicle",
+                        model = "Standard",
+                        trim = "Base",
+                        vin = "",
+                        engine = "2.0L 4-Cylinder",
+                        size = "Mid-Size",
+                        bodyType = "Sedan",
+                        transmission = "Automatic",
+                        driveType = "FWD",
+                        horsepower = "200 hp",
+                        torque = "200 lb-ft",
+                        fuelType = "Gasoline (Regular Unleaded)",
+                        tankCapacity = "14.5 Gallons",
+                        curbWeight = "3,300 lbs",
+                        tireSpec = "Standard All-Season (32 PSI)",
+                        towingCapacity = "1,000 lbs",
+                        obdProtocol = "ISO 15765-4 CAN (11-bit)",
+                        ecuFirmware = "Standard",
+                        oilSpec = "0W-20 Synthetic",
+                        coolantSpec = "OEM Long Life",
+                        brakeFluidSpec = "DOT 3/4",
+                        mileage = 0,
+                        isDefault = true
+                    )
                 )
-            )
+            }
             diagnosticsRepo.initDefaultMaintenanceIfEmpty()
         }
     }
@@ -253,6 +257,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleMapsGrounding(enabled: Boolean) {
         voiceRepo.toggleMapsGrounding(enabled)
+    }
+
+    fun toggleOpenMic(enabled: Boolean) {
+        voiceRepo.toggleOpenMic(enabled)
     }
 
     fun startLiveVoiceSession() {
@@ -414,6 +422,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun runObdScan() = triggerAiScan(false)
 
+    val allSampleDtcCodes: List<DtcCode> = diagnosticsRepo.sampleDtcDatabase
+
     fun parseDtcCodes(json: String): List<DtcCode> {
         return diagnosticsRepo.parseDtcCodes(json)
     }
@@ -424,7 +434,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearEcuCodes() {
         viewModelScope.launch {
+            diagnosticsRepo.clearTroubleCodes()
             diagnosticsRepo.clearCodes()
+            _latestScan.value = _latestScan.value?.copy(
+                dtcCodesJson = "[]",
+                healthScore = 99,
+                severity = "HEALTHY",
+                milStatus = false
+            )
         }
     }
 
@@ -573,6 +590,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             db.scanDao().clearAllScans()
             db.vehicleDao().clearAllVehicles()
             db.routeDao().clearAllRoutes()
+            db.chatDao().clearAllMessages()
 
             // 3. Sign out and reset quotas
             authManager.signOut()
@@ -581,18 +599,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _latestScan.value = null
             _selectedDtc.value = null
             _authStatusMessage.value = "All account data, routes, diagnostics & Firestore records permanently deleted"
-
-            // Re-seed default demo car for fresh start
-            db.vehicleDao().insertVehicle(
-                VehicleProfile(
-                    nickname = "Primary Commuter",
-                    year = 2024,
-                    make = "Toyota",
-                    model = "RAV4 Hybrid",
-                    vin = "4T3DFREV9RU129481",
-                    isDefault = true
-                )
-            )
 
             onComplete()
         }
@@ -641,6 +647,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateVehicleMileage(newMileage: Int) {
         _currentVehicleMileage.value = newMileage
+    }
+
+    fun deleteChatMessage(id: String) {
+        voiceRepo.deleteMessage(id)
     }
 
     override fun onCleared() {

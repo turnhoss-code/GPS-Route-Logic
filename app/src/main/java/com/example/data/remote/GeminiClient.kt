@@ -78,8 +78,11 @@ object GeminiClient {
             val sysParts = JSONArray()
             val sysPart = JSONObject()
             val fullSystemPrompt = buildString {
-                append(persona.systemInstruction)
-                append(" You are an automotive diagnostic specialist who gives driving directions in real-time on a GPS map. Recommend alternate routes based on logged trip data, OBD2 data, and damage scores. Diagnose vehicles using trip logs, fault codes, and live OBD2 data with 99% accuracy. Always give short, concise answers with emojis.")
+                append("You are an automotive diagnostic specialist who gives driving directions in real-time on a GPS map. ")
+                append("When possible: recommend alternate routes based on logged trip data, OBD2 data, and damage scores. ")
+                append("You also diagnose vehicles using trip logs and OBD2 live data with fault codes with 99% accuracy. ")
+                append("CRITICAL INSTRUCTION: You will always use short and concise answers when talking in chat with users (max 2-3 short sentences or bullet points). ")
+                append("Use emojis when possible 🚗🔧📍⚡.")
                 if (!telemetryContext.isNullOrBlank()) {
                     append("\n\n[LIVE VEHICLE & OBD-II TELEMETRY CONTEXT]:\n")
                     append(telemetryContext)
@@ -326,9 +329,8 @@ object GeminiClient {
 
         val (responseText, citations, queries) = when {
             lower.contains("engine status") || (lower.contains("engine") && (lower.contains("status") || lower.contains("current") || lower.contains("how is") || lower.contains("condition"))) -> {
-                val contextStr = if (!telemetryContext.isNullOrBlank()) "\n\n$telemetryContext" else ""
                 Triple(
-                    "🚗 **Engine Status:**\n• **RPM:** 2,150 RPM (Nominal)\n• **Speed:** 62 MPH\n• **Coolant Temp:** 198°F (Optimal range 190°F–215°F ✅)\n• **Oil Pressure:** 42 PSI (Healthy ✅)\n• **Battery:** 13.8V (Alternator charging active ✅)\n• **Fuel Trims:** STFT +1.8% | LTFT +2.1% (Within ±5% target)\n• **DTC Codes:** 2 Pending Faults (P0300 Misfire, P0420 Catalyst Efficiency)$contextStr",
+                    "🚗 **Engine Status:**\n• **RPM:** 2,150 | **Speed:** 62 MPH\n• **Coolant:** 198°F ✅ | **Oil:** 42 PSI ✅\n• **Battery:** 13.8V ✅ | **DTCs:** P0300, P0420 ⚠️",
                     listOf(
                         GroundingCitation("OBD-II CAN Bus Live Telemetry Stream", "https://gpsroutelogic.app/obd-live", "Live PID parameter IDs & ECU sensor bus"),
                         GroundingCitation("SAE J1979 Diagnostic Test Modes", "https://sae.org/standards/j1979", "Engine sensor thresholds & real-time monitoring")
@@ -338,7 +340,7 @@ object GeminiClient {
             }
             lower.contains("obd") || lower.contains("diagnostic") || lower.contains("telemetry") || lower.contains("sensor") -> {
                 Triple(
-                    "📊 **OBD-II Live Diagnostic Telemetry:**\n• **Bus Protocol:** ISO 15765-4 CAN (500 kbaud, 11-bit)\n• **Engine Load:** 34% (Cruising load nominal)\n• **MAF Rate:** 18.4 g/s\n• **Intake Air Temp:** 74°F\n• **Catalytic Temp:** 1,240°F (Normal)\n• **System Status:** 2 Fault Codes Logged, Freeze Frame recorded.",
+                    "📊 **OBD-II Telemetry:**\n• **Protocol:** ISO 15765-4 CAN ✅\n• **Load:** 34% | **MAF:** 18.4 g/s\n• **Catalytic Temp:** 1,240°F | **DTCs:** 2 Logged ⚠️",
                     listOf(
                         GroundingCitation("OBD-II Diagnostic PID Specifications", "https://obd-codes.com/pids", "SAE standard sensor PID reference"),
                         GroundingCitation("CAN Bus Live Telemetry Monitor", "https://gpsroutelogic.app/telemetry", "Vehicle diagnostic bus feed")
@@ -348,7 +350,7 @@ object GeminiClient {
             }
             lower.contains("damage") || lower.contains("score") || lower.contains("alternate route") || lower.contains("detour based on") -> {
                 Triple(
-                    "🛡️ **Route Logic Damage & Trip Analysis:**\n• **Chassis Damage Score:** 14/100 (Low Risk - Road Debris & Pothole events detected)\n• **Trip Logs:** 3 trips logged over 148 miles\n• **Recommendation:** Alternate Route via Highway 101 bypass is recommended to avoid high-impact construction zones on I-405 and protect suspension health.",
+                    "🛡️ **Route Logic Damage & Detour:**\n• **Damage Score:** 14/100 (Low Risk) ✅\n• **Recommendation:** Take Hwy 101 bypass to avoid I-405 potholes & protect suspension 🚗⚡",
                     listOf(
                         GroundingCitation("Road Surface Telemetry & Impact Severity", "https://gpsroutelogic.app/damage-reports", "Chassis impact accelerometer logs"),
                         GroundingCitation("Caltrans Highway Pavement Quality Index", "https://quickmap.dot.ca.gov", "Road surface ratings & detour paths")
@@ -358,7 +360,7 @@ object GeminiClient {
             }
             lower.contains("p0300") || lower.contains("misfire") -> {
                 Triple(
-                    "🔧 [DTC Analysis]: P0300 indicates Random/Multiple Cylinder Misfire. High-priority checks:\n1. Inspect Ignition Coils #1-#4 for dielectric breakdown\n2. Verify spark plug electrode gap (target: 0.028-0.032 in)\n3. Check fuel trim for unmetered vacuum intake air leaks.\nEstimated DIY repair cost: $45-$120. Shop labor: $180-$320.",
+                    "🔧 **P0300 Misfire Diagnostic:**\n• **Cause:** Random cylinder misfire ⚠️\n• **Fix:** Check Ignition coils #1-#4 & spark plug gaps (0.030 in) 🛠️\n• **Est. Cost:** $45–$120 DIY | $220 Shop 💵",
                     listOf(
                         GroundingCitation("OBD-II Diagnostic Standards Hub", "https://obd-codes.com/p0300", "Diagnostic flowchart for random cylinder misfires"),
                         GroundingCitation("NHTSA Vehicle Technical Service Bulletins", "https://nhtsa.gov/recalls", "Manufacturer service bulletin index")
@@ -368,7 +370,7 @@ object GeminiClient {
             }
             lower.contains("p0420") || lower.contains("catalyst") || lower.contains("emissions") -> {
                 Triple(
-                    "🔧 [DTC Analysis]: P0420: Catalyst System Efficiency Below Threshold (Bank 1). Downstream O2 sensor output is fluctuating rapidly rather than staying steady (~0.65V). Recommended fix: Check exhaust manifold gaskets & flex pipe for pinhole leaks before catalytic converter replacement.",
+                    "🔧 **P0420 Catalyst Diagnostic:**\n• **Cause:** Bank 1 Catalyst efficiency below threshold ⚠️\n• **Fix:** Check exhaust manifold gaskets & downstream O2 sensor 🛠️",
                     listOf(
                         GroundingCitation("EPA Emissions & OBD-II Compliance Guide", "https://epa.gov/vehicle-and-fuel-emissions", "Catalyst monitoring & O2 sensor thresholds")
                     ),
@@ -377,7 +379,7 @@ object GeminiClient {
             }
             lower.contains("traffic") || lower.contains("i-405") || lower.contains("congestion") || lower.contains("delay") || lower.contains("detour") -> {
                 Triple(
-                    "🚦 [Live Traffic Intelligence]: Live telemetry and regional highway sensors indicate severe congestion on the I-405 North (+16 min delay) due to maintenance work near Junction 28. GPS-Route-Logic recommends diverting onto Highway 101 Express Connector at Exit 24 to save 12 minutes and bypass 4.2 miles of stop-and-go braking.",
+                    "🚦 **Traffic Alert:**\n• **I-405 North:** +16 min delay 🛑\n• **Bypass:** Take Hwy 101 Express at Exit 24 to save 12 min ⚡",
                     listOf(
                         GroundingCitation("Caltrans Live Highway Corridor Feed", "https://quickmap.dot.ca.gov", "Real-time road closures, speeds, and incident logs"),
                         GroundingCitation("National Highway Traffic Safety Telemetry", "https://transportation.gov/traffic", "Regional transit delay forecasts")
@@ -387,7 +389,7 @@ object GeminiClient {
             }
             lower.contains("fuel") || lower.contains("gas") || lower.contains("eco") || lower.contains("mileage") -> {
                 Triple(
-                    "⚡ [Eco-Route Telemetry]: Your current average fuel economy is 28.5 MPG (+14% above baseline). Driving with smooth throttle modulation under 2,400 RPM will save approximately 0.52 gallons on this 42-mile commute. Fuel prices in your immediate corridor currently average \$4.29/gal for Regular and \$4.75/gal for Premium 91.",
+                    "⚡ **Eco-Route Telemetry:**\n• **Avg MPG:** 28.5 MPG (+14% saving) 🌿\n• **Tip:** Keep throttle under 2,400 RPM to save 0.5 gal ⛽\n• **Fuel Price:** \$4.29/gal Reg | \$4.75/gal Prem 💵",
                     listOf(
                         GroundingCitation("AAA Daily Fuel Gauge Report", "https://gasprices.aaa.com", "Statewide gas price indexes and metro averages")
                     ),
@@ -396,7 +398,7 @@ object GeminiClient {
             }
             lower.contains("truck") || lower.contains("cargo") || lower.contains("weight") || lower.contains("clearance") || lower.contains("bridge") -> {
                 Triple(
-                    "🚚 [Commercial Logistics Guidance]: Route logic verified for commercial transport: Maximum bridge clearance on this route is 14 ft 6 in (Clearance safe). Grade slope over the summit peaks at 5.2% downgrade — engage engine brake/Jake brake on descent to prevent brake fade.",
+                    "🚚 **Cargo Logistics:**\n• **Bridge Clearance:** 14 ft 6 in (Safe) ✅\n• **Steep Grade:** 5.2% downgrade ahead — engage Jake brake ⚠️",
                     listOf(
                         GroundingCitation("Federal Motor Carrier Safety Administration (FMCSA)", "https://fmcsa.dot.gov/regulations", "Commercial bridge height clearances & truck routes")
                     ),
@@ -405,7 +407,7 @@ object GeminiClient {
             }
             lower.contains("charger") || lower.contains("ev") || lower.contains("battery") -> {
                 Triple(
-                    "⚡ [EV Navigation Intelligence]: Found 2 high-speed charging hubs along your current heading. The nearest 350kW DC Fast Charger is 1.8 miles away with 6 stalls open. Battery pre-conditioning is recommended 10 minutes prior to arrival.",
+                    "⚡ **EV Fast Chargers:**\n• **Nearest:** 350kW Fast Hub 1.8 mi away (6 stalls open) 🔌\n• **Tip:** Pre-condition battery 10 min before arrival 🔋",
                     listOf(
                         GroundingCitation("US Dept of Energy Alternative Fuels Station Locator", "https://afdc.energy.gov/stations", "Public EV fast charger network real-time status")
                     ),
@@ -414,7 +416,7 @@ object GeminiClient {
             }
             else -> {
                 Triple(
-                    "🛰️ [${persona.shortName}]: Vehicle telemetry is active. OBD-II CAN bus connection nominal. I am monitoring live traffic congestion, fuel trims, engine coolant temperature, and optimized GPS bypass corridors. How can I assist your drive right now?",
+                    "🚗 **Route Logic AI Active:**\n• **OBD-II & GPS:** Connected 📍\n• **Status:** Monitoring live traffic, fuel trims & ECU health. How can I assist? ⚡",
                     if (enableSearch) listOf(GroundingCitation("GPS Route Logic Live Highway Feed", "https://gpsroutelogic.app/live", "Real-time navigation & diagnostics intelligence")) else emptyList(),
                     if (enableSearch) listOf("Real-time GPS route updates", "Automotive OBD-II live telemetry") else emptyList()
                 )

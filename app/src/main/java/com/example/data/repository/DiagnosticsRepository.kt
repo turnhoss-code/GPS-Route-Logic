@@ -52,7 +52,7 @@ class DiagnosticsRepository(
     val damageEvents: Flow<List<DamageEvent>> = damageDao.getAllDamageEvents()
     val tripLogs: Flow<List<TripLog>> = tripLogDao.getAllTrips()
 
-    // Sample OBD-II database for DTC engine
+    // Comprehensive OBD-II database for DTC engine & Code Lookup Screen
     val sampleDtcDatabase = listOf(
         DtcCode(
             code = "P0300",
@@ -103,8 +103,122 @@ class DiagnosticsRepository(
             possibleCauses = "Loose/defective fuel tank cap, EVAP purge solenoid stuck, filler neck seal torn.",
             estimatedRepairCost = "$20 - $140",
             recommendedFix = "Tighten or replace fuel cap rubber O-ring seal, test purge valve duty cycle."
+        ),
+        DtcCode(
+            code = "P0113",
+            description = "Intake Air Temperature Sensor 1 Circuit High Input",
+            system = "Fuel & Air Metering",
+            severity = ScanSeverity.ADVISORY,
+            symptoms = "Hard starting in cold weather, rich fuel trim, Check Engine Light on.",
+            possibleCauses = "Unplugged or faulty IAT sensor, open in ground circuit, corroded connector pins.",
+            estimatedRepairCost = "$35 - $110",
+            recommendedFix = "Check IAT sensor resistance with multimeter; clean pins or replace sensor module."
+        ),
+        DtcCode(
+            code = "P0500",
+            description = "Vehicle Speed Sensor 'A' Circuit Malfunction",
+            system = "Vehicle Speed & Idle",
+            severity = ScanSeverity.MODERATE,
+            symptoms = "Erratic or non-functional speedometer, harsh transmission shifts, ABS warning illuminated.",
+            possibleCauses = "Faulty transmission output speed sensor, damaged wiring harness, ECU connector corrosion.",
+            estimatedRepairCost = "$90 - $210",
+            recommendedFix = "Inspect VSS wire harness for chafing near transaxle, probe AC signal output during rotation."
+        ),
+        DtcCode(
+            code = "P0700",
+            description = "Transmission Control System Malfunction (MIL Request)",
+            system = "Automatic Transmission",
+            severity = ScanSeverity.CRITICAL,
+            symptoms = "Transmission in limp-home mode (locked in 3rd gear), delayed torque converter lockup.",
+            possibleCauses = "TCM detected sub-fault code, low ATF fluid pressure, solenoid pack connector moisture.",
+            estimatedRepairCost = "$150 - $600",
+            recommendedFix = "Interrogate TCM sub-codes with OBD2 scanner, check transmission fluid level and condition."
+        ),
+        DtcCode(
+            code = "C0035",
+            description = "Left Front Wheel Speed Sensor Circuit Fault",
+            system = "Chassis / ABS & Traction",
+            severity = ScanSeverity.MODERATE,
+            symptoms = "ABS light on, Traction Control disabled, pedal pulsation during normal stops.",
+            possibleCauses = "Damaged magnetic tone ring, road debris on sensor tip, broken sensor wire pigtail.",
+            estimatedRepairCost = "$75 - $180",
+            recommendedFix = "Clean tone ring with brake cleaner; test wheel speed sensor millivolt AC wave on scanner."
+        ),
+        DtcCode(
+            code = "C0040",
+            description = "Right Front Wheel Speed Sensor Circuit Malfunction",
+            system = "Chassis / ABS & Traction",
+            severity = ScanSeverity.MODERATE,
+            symptoms = "Stabilitrak / VSC warning lamp lit, cruise control unavailable.",
+            possibleCauses = "Hub bearing play damaging sensor tip, wire harness severed by suspension arm.",
+            estimatedRepairCost = "$80 - $195",
+            recommendedFix = "Inspect wheel bearing end-play and replace right front speed sensor assembly."
+        ),
+        DtcCode(
+            code = "C1201",
+            description = "Engine Control System Malfunction (ABS / VSC Fail-Safe Mode)",
+            system = "Chassis / Brake Integration",
+            severity = ScanSeverity.ADVISORY,
+            symptoms = "VSC and Trac lights lit concurrently with Check Engine Light.",
+            possibleCauses = "Skid control ECU enters fail-safe whenever ECM has active powertrain DTC.",
+            estimatedRepairCost = "$0 (Secondary fault)",
+            recommendedFix = "Resolve primary engine DTCs (e.g. P0300 or P0171); C1201 clears automatically upon engine fix."
+        ),
+        DtcCode(
+            code = "B0001",
+            description = "Driver Frontal Stage 1 Deployment Control (Airbag Loop)",
+            system = "Body / Safety Restraints",
+            severity = ScanSeverity.CRITICAL,
+            symptoms = "Supplemental Restraint System (SRS) airbag light illuminated continuously.",
+            possibleCauses = "Clockspring ribbon cable broken inside steering column, loose yellow SRS connector under seat.",
+            estimatedRepairCost = "$180 - $420",
+            recommendedFix = "Replace steering column clockspring assembly with battery disconnected for >15 minutes."
+        ),
+        DtcCode(
+            code = "B1000",
+            description = "Electronic Control Unit (ECU) Internal Hardware Fault",
+            system = "Body Control Module (BCM)",
+            severity = ScanSeverity.CRITICAL,
+            symptoms = "Intermittent power window/lock operation, interior lighting anomalies.",
+            possibleCauses = "Voltage spike from weak battery, water ingress into BCM junction block, internal microprocessor fault.",
+            estimatedRepairCost = "$350 - $850",
+            recommendedFix = "Inspect BCM for water corrosion; re-flash firmware calibration or replace BCM."
+        ),
+        DtcCode(
+            code = "B1318",
+            description = "Battery Voltage Below Vehicle Operational Minimum (<10.5V)",
+            system = "Electrical / Charging",
+            severity = ScanSeverity.MODERATE,
+            symptoms = "Slow engine crank, flickering dash displays, multiple false-positive sensor DTCs.",
+            possibleCauses = "Failing 12V AGM/lead-acid battery, slipping alternator belt, parasitic battery draw when parked.",
+            estimatedRepairCost = "$130 - $260",
+            recommendedFix = "Perform battery conductance test, check charging voltage (>13.8V running), replace 12V battery."
+        ),
+        DtcCode(
+            code = "U0100",
+            description = "Lost Communication With Engine Control Module (ECM / PCM)",
+            system = "Network / CAN High Speed Bus",
+            severity = ScanSeverity.CRITICAL,
+            symptoms = "No-crank / no-start, multiple warning lights on dashboard, transmission shift lock stuck.",
+            possibleCauses = "Blown ECM fuse, damaged CAN-H / CAN-L twisted pair wires, disconnected ECM ground wire.",
+            estimatedRepairCost = "$110 - $450",
+            recommendedFix = "Measure CAN Bus terminating resistance (60 ohms across DLC pins 6 & 14) and verify main power relay."
+        ),
+        DtcCode(
+            code = "U0121",
+            description = "Lost Communication With Anti-Lock Brake System (ABS) Module",
+            system = "Network / CAN Bus",
+            severity = ScanSeverity.MODERATE,
+            symptoms = "ABS, Brake, and Stability lights on, speedometer may drop to zero intermittently.",
+            possibleCauses = "ABS module power ground broken, corroded ABS wiring harness connector, blown ABS pump fuse.",
+            estimatedRepairCost = "$95 - $320",
+            recommendedFix = "Check ABS module main fusible link (40A) and verify CAN communication line continuity."
         )
     )
+
+    fun clearTroubleCodes() {
+        _telemetry.value = _telemetry.value.copy(milCheckEngineOn = false)
+    }
 
     fun updateTelemetrySimulated(deltaRpm: Int = 0, deltaSpeed: Int = 0) {
         val current = _telemetry.value

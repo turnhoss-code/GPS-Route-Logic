@@ -3,8 +3,8 @@
 **Last Updated:** August 27, 2026  
 **Effective Date:** August 27, 2026  
 **Application Name:** GPS-Route-Logic  
-**Package Name:** `com.gpsroutelogic`  
-**Developer Contact:** turnhoss187@gmail.com  
+**Package Name:** `com.aistudio.gpsroutelogic.uid`  
+**Developer Contact:** privacy@gpsroutelogic.com  
 **Developer Portal & Legal Hub:** https://ais-pre-7wsizo553tjveiu2qj2qmb-333894732567.us-west2.run.app  
 
 ---
@@ -67,7 +67,7 @@ GPS-Route-Logic integrates with trusted industry-standard service providers:
 - **On-Device Data:** You can delete all your diagnostic scan logs, saved routes, and vehicle profiles at any time directly in the app via **Account & Settings > Data Control > Erase All Data**.
 - **Account Deletion:** You have the absolute right to request the permanent deletion of your account and all associated cloud data. You can submit a deletion request directly in-app or through our web deletion portal at:
   - **Data Deletion URL:** https://ais-pre-7wsizo553tjveiu2qj2qmb-333894732567.us-west2.run.app/data-deletion.html
-  - **Email Deletion Request:** turnhoss187@gmail.com (Subject: `Data Deletion Request - com.gpsroutelogic`). Requests are processed within 24–48 hours.
+  - **Email Deletion Request:** privacy@gpsroutelogic.com (Subject: `Data Deletion Request - com.aistudio.gpsroutelogic.uid`). Requests are processed within 24–48 hours.
 
 ---
 
@@ -92,5 +92,5 @@ We may update our Privacy Policy periodically. We will notify you of any changes
 ## 9. Contact Us
 
 If you have any questions or concerns regarding this Privacy Policy, please contact us:
-- **Email:** turnhoss187@gmail.com
+- **Email:** privacy@gpsroutelogic.com
 - **Website:** https://ais-pre-7wsizo553tjveiu2qj2qmb-333894732567.us-west2.run.app/privacy-policy.html

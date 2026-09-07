@@ -35,7 +35,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Straighten
-import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -92,19 +92,19 @@ fun GarageScreen(
 
     // Dialog state for adding
     var inputNickname by remember { mutableStateOf("") }
-    var inputYear by remember { mutableStateOf("2024") }
-    var inputMake by remember { mutableStateOf("Honda") }
-    var inputModel by remember { mutableStateOf("Accord") }
-    var inputTrim by remember { mutableStateOf("Touring Elite Edition") }
-    var inputEngine by remember { mutableStateOf("2.0L Turbo 4-Cyl DOHC 16V") }
-    var inputSize by remember { mutableStateOf("Mid-Size Sedan (196.1″ L × 73.3″ W × 57.1″ H)") }
-    var inputTransmission by remember { mutableStateOf("10-Speed Electronic Sport Automatic") }
-    var inputDriveType by remember { mutableStateOf("Intelligent All-Wheel Drive (AWD)") }
-    var inputHorsepower by remember { mutableStateOf("252 hp @ 6,500 RPM") }
-    var inputFuelType by remember { mutableStateOf("Gasoline (Premium 91+ Unleaded)") }
-    var inputTireSpec by remember { mutableStateOf("235/40R19 96V (33 PSI Cold)") }
-    var inputMileage by remember { mutableStateOf("45200") }
-    var inputVin by remember { mutableStateOf("1HGCV1F34PA092811") }
+    var inputYear by remember { mutableStateOf("") }
+    var inputMake by remember { mutableStateOf("") }
+    var inputModel by remember { mutableStateOf("") }
+    var inputTrim by remember { mutableStateOf("") }
+    var inputEngine by remember { mutableStateOf("") }
+    var inputSize by remember { mutableStateOf("") }
+    var inputTransmission by remember { mutableStateOf("") }
+    var inputDriveType by remember { mutableStateOf("") }
+    var inputHorsepower by remember { mutableStateOf("") }
+    var inputFuelType by remember { mutableStateOf("") }
+    var inputTireSpec by remember { mutableStateOf("") }
+    var inputMileage by remember { mutableStateOf("") }
+    var inputVin by remember { mutableStateOf("") }
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
@@ -202,7 +202,7 @@ fun GarageScreen(
                             modifier = Modifier.testTag("replay_greeting_button")
                         ) {
                             Icon(
-                                Icons.Default.VolumeUp,
+                                Icons.AutoMirrored.Filled.VolumeUp,
                                 contentDescription = "Play Greeting",
                                 tint = Color.Black,
                                 modifier = Modifier.size(16.dp)
@@ -600,7 +600,23 @@ fun GarageScreen(
         // Add Vehicle Dialog with full detail boxes fields
         if (showAddDialog) {
             AlertDialog(
-                onDismissRequest = { showAddDialog = false },
+                onDismissRequest = {
+                    showAddDialog = false
+                    inputNickname = ""
+                    inputYear = ""
+                    inputMake = ""
+                    inputModel = ""
+                    inputTrim = ""
+                    inputEngine = ""
+                    inputSize = ""
+                    inputTransmission = ""
+                    inputDriveType = ""
+                    inputHorsepower = ""
+                    inputFuelType = ""
+                    inputTireSpec = ""
+                    inputMileage = ""
+                    inputVin = ""
+                },
                 title = { Text("Add New Vehicle Profile", fontWeight = FontWeight.Bold, color = NeonCyan) },
                 text = {
                     LazyColumn(
@@ -611,7 +627,8 @@ fun GarageScreen(
                             OutlinedTextField(
                                 value = inputNickname,
                                 onValueChange = { inputNickname = it },
-                                label = { Text("Nickname (e.g. Daily Driver)") },
+                                label = { Text("Nickname") },
+                                placeholder = { Text("e.g. Daily Driver") },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -622,6 +639,7 @@ fun GarageScreen(
                                     value = inputYear,
                                     onValueChange = { inputYear = it },
                                     label = { Text("Year") },
+                                    placeholder = { Text("e.g. 2024") },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true
                                 )
@@ -629,6 +647,7 @@ fun GarageScreen(
                                     value = inputMake,
                                     onValueChange = { inputMake = it },
                                     label = { Text("Make") },
+                                    placeholder = { Text("e.g. Toyota, Ford") },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true
                                 )
@@ -639,6 +658,7 @@ fun GarageScreen(
                                 value = inputModel,
                                 onValueChange = { inputModel = it },
                                 label = { Text("Model") },
+                                placeholder = { Text("e.g. Camry, F-150") },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -647,7 +667,8 @@ fun GarageScreen(
                             OutlinedTextField(
                                 value = inputTrim,
                                 onValueChange = { inputTrim = it },
-                                label = { Text("Trim Level (e.g. Touring / Limited / M-Sport)") },
+                                label = { Text("Trim Level") },
+                                placeholder = { Text("e.g. Touring, SE, Limited") },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -656,7 +677,8 @@ fun GarageScreen(
                             OutlinedTextField(
                                 value = inputEngine,
                                 onValueChange = { inputEngine = it },
-                                label = { Text("Engine Specs (e.g. 2.0L Turbo 4-Cyl / 3.0L V6)") },
+                                label = { Text("Engine Specs") },
+                                placeholder = { Text("e.g. 2.5L 4-Cyl, 3.5L V6") },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -665,7 +687,8 @@ fun GarageScreen(
                             OutlinedTextField(
                                 value = inputSize,
                                 onValueChange = { inputSize = it },
-                                label = { Text("Vehicle Size / Class (e.g. Mid-Size Sedan)") },
+                                label = { Text("Vehicle Class") },
+                                placeholder = { Text("e.g. Mid-Size Sedan, Compact SUV") },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -675,6 +698,7 @@ fun GarageScreen(
                                 value = inputHorsepower,
                                 onValueChange = { inputHorsepower = it },
                                 label = { Text("Horsepower / Torque") },
+                                placeholder = { Text("e.g. 203 hp") },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -683,7 +707,8 @@ fun GarageScreen(
                             OutlinedTextField(
                                 value = inputTransmission,
                                 onValueChange = { inputTransmission = it },
-                                label = { Text("Transmission (e.g. 10-Speed Automatic)") },
+                                label = { Text("Transmission") },
+                                placeholder = { Text("e.g. 8-Speed Automatic, CVT") },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -692,7 +717,8 @@ fun GarageScreen(
                             OutlinedTextField(
                                 value = inputDriveType,
                                 onValueChange = { inputDriveType = it },
-                                label = { Text("Drivetrain (e.g. AWD / FWD / RWD)") },
+                                label = { Text("Drivetrain") },
+                                placeholder = { Text("e.g. FWD, AWD, 4WD") },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -701,7 +727,8 @@ fun GarageScreen(
                             OutlinedTextField(
                                 value = inputFuelType,
                                 onValueChange = { inputFuelType = it },
-                                label = { Text("Fuel Grade (e.g. Gasoline 91+ Premium)") },
+                                label = { Text("Fuel Grade") },
+                                placeholder = { Text("e.g. Regular Unleaded, Premium") },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -710,7 +737,18 @@ fun GarageScreen(
                             OutlinedTextField(
                                 value = inputTireSpec,
                                 onValueChange = { inputTireSpec = it },
-                                label = { Text("Tire Spec (e.g. 235/40R19 33 PSI)") },
+                                label = { Text("Tire Spec") },
+                                placeholder = { Text("e.g. 215/55R17 32 PSI") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                        }
+                        item {
+                            OutlinedTextField(
+                                value = inputMileage,
+                                onValueChange = { inputMileage = it },
+                                label = { Text("Current Mileage") },
+                                placeholder = { Text("e.g. 15000") },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -720,6 +758,7 @@ fun GarageScreen(
                                 value = inputVin,
                                 onValueChange = { inputVin = it },
                                 label = { Text("VIN (17-character)") },
+                                placeholder = { Text("Optional 17-character VIN") },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
@@ -729,22 +768,41 @@ fun GarageScreen(
                 confirmButton = {
                     Button(
                         onClick = {
+                            val curYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+                            val y = inputYear.trim()
+                            val m = inputMake.trim()
+                            val mo = inputModel.trim()
+                            val fallbackName = listOf(y, m, mo).filter { it.isNotEmpty() }.joinToString(" ")
                             viewModel.addVehicle(
-                                nickname = inputNickname.ifBlank { "$inputYear $inputMake" },
-                                year = inputYear.toIntOrNull() ?: 2024,
-                                make = inputMake.ifBlank { "Honda" },
-                                model = inputModel.ifBlank { "Accord" },
-                                trim = inputTrim.ifBlank { "Touring Edition" },
-                                engine = inputEngine.ifBlank { "2.0L Turbo 4-Cyl DOHC 16V" },
-                                size = inputSize.ifBlank { "Mid-Size Sedan" },
-                                transmission = inputTransmission.ifBlank { "10-Speed Electronic Automatic" },
-                                driveType = inputDriveType.ifBlank { "AWD" },
-                                horsepower = inputHorsepower.ifBlank { "252 hp @ 6,500 RPM" },
-                                fuelType = inputFuelType.ifBlank { "Gasoline (Premium 91+)" },
-                                tireSpec = inputTireSpec.ifBlank { "235/40R19 (33 PSI Cold)" },
-                                mileage = inputMileage.toIntOrNull() ?: 45200,
-                                vin = inputVin
+                                nickname = inputNickname.trim().ifBlank { fallbackName.ifBlank { "Vehicle Profile" } },
+                                year = y.toIntOrNull() ?: curYear,
+                                make = m.ifBlank { "Vehicle" },
+                                model = mo.ifBlank { "Standard" },
+                                trim = inputTrim.trim().ifBlank { "Standard" },
+                                engine = inputEngine.trim().ifBlank { "Standard Engine" },
+                                size = inputSize.trim().ifBlank { "Mid-Size" },
+                                transmission = inputTransmission.trim().ifBlank { "Automatic" },
+                                driveType = inputDriveType.trim().ifBlank { "FWD" },
+                                horsepower = inputHorsepower.trim().ifBlank { "N/A" },
+                                fuelType = inputFuelType.trim().ifBlank { "Regular Unleaded" },
+                                tireSpec = inputTireSpec.trim().ifBlank { "Standard" },
+                                mileage = inputMileage.trim().toIntOrNull() ?: 0,
+                                vin = inputVin.trim()
                             )
+                            inputNickname = ""
+                            inputYear = ""
+                            inputMake = ""
+                            inputModel = ""
+                            inputTrim = ""
+                            inputEngine = ""
+                            inputSize = ""
+                            inputTransmission = ""
+                            inputDriveType = ""
+                            inputHorsepower = ""
+                            inputFuelType = ""
+                            inputTireSpec = ""
+                            inputMileage = ""
+                            inputVin = ""
                             showAddDialog = false
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = NeonCyan)
@@ -753,7 +811,23 @@ fun GarageScreen(
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showAddDialog = false }) {
+                    TextButton(onClick = {
+                        showAddDialog = false
+                        inputNickname = ""
+                        inputYear = ""
+                        inputMake = ""
+                        inputModel = ""
+                        inputTrim = ""
+                        inputEngine = ""
+                        inputSize = ""
+                        inputTransmission = ""
+                        inputDriveType = ""
+                        inputHorsepower = ""
+                        inputFuelType = ""
+                        inputTireSpec = ""
+                        inputMileage = ""
+                        inputVin = ""
+                    }) {
                         Text("Cancel", color = Color.LightGray)
                     }
                 }

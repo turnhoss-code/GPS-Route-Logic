@@ -96,7 +96,7 @@ class AuthManager(private val context: Context) {
             val verifiedUser = UserAccount(
                 uid = "google_user_${System.currentTimeMillis().toString().takeLast(6)}",
                 displayName = "Google Pilot",
-                email = "turnhoss187@gmail.com",
+                email = "driver@gpsroutelogic.com",
                 photoUrl = null,
                 tier = SubscriptionTier.PRO,
                 billingPeriod = BillingPeriod.YEARLY,
