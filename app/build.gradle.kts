@@ -17,8 +17,8 @@ android {
     applicationId = "com.aistudio.gpsroutelogic.uid"
     minSdk = 24
     targetSdk = 36
-    versionCode = 3
-    versionName = "3.0.0"
+    versionCode = 4
+    versionName = "4.0"
 
     // Configured for Play Console & Google Mobile Sign-In
     // Target SHA-1 Fingerprint: 17:15:91:21:4B:29:E7:2C:5B:2C:1C:A3:64:81:8C:99:0D:EA:C2:4B
