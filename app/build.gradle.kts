@@ -17,11 +17,8 @@ android {
     applicationId = "com.aistudio.gpsroutelogic.uid"
     minSdk = 24
     targetSdk = 36
-    // Automated incremental version code based on build property or build timestamp
-    val buildVersionCode = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: 2
-    val buildVersionName = project.findProperty("versionName")?.toString() ?: "1.0.1"
-    versionCode = buildVersionCode
-    versionName = buildVersionName
+    versionCode = 3
+    versionName = "3.0.0"
 
     // Configured for Play Console & Google Mobile Sign-In
     // Target SHA-1 Fingerprint: 17:15:91:21:4B:29:E7:2C:5B:2C:1C:A3:64:81:8C:99:0D:EA:C2:4B
@@ -98,7 +95,7 @@ dependencies {
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
-  // implementation(libs.androidx.datastore.preferences)
+  implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)

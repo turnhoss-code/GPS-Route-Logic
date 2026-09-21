@@ -106,8 +106,8 @@ fun MainApp(viewModel: MainViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val audioPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        viewModel.greetUserOnOpen(force = true)
+    ) { _ ->
+        // Audio permission granted for speech recognition and live voice copilot
     }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -118,8 +118,6 @@ fun MainApp(viewModel: MainViewModel) {
 
         if (!hasMicPermission) {
             audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
-        } else {
-            viewModel.greetUserOnOpen()
         }
     }
 

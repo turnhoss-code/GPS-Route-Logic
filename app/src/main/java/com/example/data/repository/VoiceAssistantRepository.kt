@@ -16,6 +16,9 @@ import com.example.data.model.ChatSender
 import com.example.data.model.ChatbotPersona
 import com.example.data.model.GeminiAiModel
 import com.example.data.model.LiveVoiceSessionState
+import com.example.data.model.VeoAspectRatio
+import com.example.data.model.VeoGenerationStatus
+import com.example.data.model.VeoVideoGeneration
 import com.example.data.remote.GeminiClient
 import com.example.data.remote.GeminiGenerationResult
 import kotlinx.coroutines.CoroutineScope
@@ -30,11 +33,22 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import java.util.UUID
 
-enum class GeminiFemaleVoice(val displayName: String, val personaDescription: String, val pitch: Float, val speed: Float) {
-    AOEDE("Aoede (Gemini Female)", "Warm, natural & crystal-clear automotive voice", 1.15f, 1.02f),
-    KORE("Kore (Diagnostic Pro)", "Precise, assertive ASE-certified specialist", 1.08f, 1.05f),
-    NOVA("Nova (Energetic Co-Pilot)", "Fast-paced dynamic GPS lane navigator", 1.22f, 1.08f)
+enum class GeminiFemaleVoice(
+    val displayName: String,
+    val personaDescription: String,
+    val pitch: Float,
+    val speed: Float,
+    val gender: String = "Female",
+    val apiVoiceName: String = "Aoede"
+) {
+    AOEDE("Aoede (Natural Studio)", "Warm, natural & crystal-clear automotive voice", 1.10f, 1.00f, "Female", "Aoede"),
+    KORE("Kore (Diagnostic Pro)", "Assertive, precise ASE-certified specialist", 1.05f, 1.02f, "Female", "Kore"),
+    NOVA("Nova (Energetic Co-Pilot)", "Fast-paced dynamic GPS lane navigator", 1.18f, 1.06f, "Female", "Nova"),
+    FENRIR("Fenrir (Resonant Mechanic)", "Deep, resonant natural automotive mechanic", 0.92f, 0.98f, "Male", "Fenrir"),
+    PUCK("Puck (Upbeat Navigator)", "Friendly, dynamic real-time GPS road guide", 1.04f, 1.02f, "Male", "Puck")
 }
+
+typealias GeminiNaturalVoice = GeminiFemaleVoice
 
 class VoiceAssistantRepository(
     private val context: Context,
@@ -55,7 +69,7 @@ class VoiceAssistantRepository(
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
 
     // Model, Persona, and Voice selection
-    private val _selectedModel = MutableStateFlow(GeminiAiModel.FLASH) // Latest free model gemini-3.5-flash
+    private val _selectedModel = MutableStateFlow(GeminiAiModel.LIVE_3_8) // Gemini Live API (gemini-3.8-live) default
     val selectedModel: StateFlow<GeminiAiModel> = _selectedModel.asStateFlow()
 
     private val _selectedPersona = MutableStateFlow(ChatbotPersona.MECHANIC)
@@ -102,6 +116,13 @@ class VoiceAssistantRepository(
     private val _sttError = MutableStateFlow<String?>(null)
     val sttError: StateFlow<String?> = _sttError.asStateFlow()
 
+    // Veo 3 Video Generation State
+    private val _veoVideos = MutableStateFlow<List<VeoVideoGeneration>>(emptyList())
+    val veoVideos: StateFlow<List<VeoVideoGeneration>> = _veoVideos.asStateFlow()
+
+    private val _isGeneratingVeo = MutableStateFlow(false)
+    val isGeneratingVeo: StateFlow<Boolean> = _isGeneratingVeo.asStateFlow()
+
     private var waveformJob: Job? = null
     private var restartListeningJob: Job? = null
     private val repoScope = CoroutineScope(Dispatchers.Main)
@@ -126,7 +147,7 @@ class VoiceAssistantRepository(
                         sender = ChatSender.ASSISTANT,
                         content = "Hi, I'm GPS Route Logic A.I.. How can I help today?",
                         isVoice = true,
-                        modelUsed = "gemini-3.1-flash-live-preview",
+                        modelUsed = "gemini-2.5-flash-native-audio-preview-12-2025",
                         personaUsed = "Master Mechanic & OBD-II Co-Pilot"
                     )
                     chatDao.insertMessage(initialGreeting.toEntity())
@@ -145,46 +166,59 @@ class VoiceAssistantRepository(
         if (status == TextToSpeech.SUCCESS) {
             applyFemaleVoiceConfiguration()
             isTtsReady = true
-
-            // Greet user with Gemini female voice & open mic upon app start-up
-            greetUserOnOpen(force = false)
         }
     }
 
     fun applyFemaleVoiceConfiguration() {
         try {
-            val femaleVoiceConfig = _selectedFemaleVoice.value
+            val voiceConfig = _selectedFemaleVoice.value
             tts?.language = Locale.US
 
-            // Search for high-quality natural female voice in installed TTS voices
+            val isMale = voiceConfig.gender.equals("Male", ignoreCase = true)
             val availableVoices = tts?.voices
-            val highQualityFemaleVoice = availableVoices?.firstOrNull { v ->
-                val name = v.name.lowercase()
-                val lang = v.locale?.language.orEmpty().lowercase()
-                val isUsOrEn = lang == "en" || lang.startsWith("en")
-                val isNetworkOrNeural = name.contains("network") || name.contains("neural") || name.contains("sfg") || name.contains("iol") || name.contains("tpf")
-                val isFemale = name.contains("female") || name.contains("f0") || name.contains("aoede") || name.contains("kore") || name.contains("nova") ||
-                        v.features?.contains("female") == true
-                isUsOrEn && (isFemale || isNetworkOrNeural)
-            } ?: availableVoices?.firstOrNull { v ->
-                val name = v.name.lowercase()
-                val lang = v.locale?.language.orEmpty().lowercase()
-                val isFemale = name.contains("female") || name.contains("f0") || name.contains("sfg") ||
-                        name.contains("rjs") || name.contains("aoede") || name.contains("kore") || name.contains("nova") ||
-                        v.features?.contains("female") == true
-                (lang == "en" || lang.startsWith("en")) && isFemale
-            } ?: availableVoices?.firstOrNull { v ->
-                val lang = v.locale?.language.orEmpty().lowercase()
-                lang == "en" && !v.name.lowercase().contains("male")
+
+            val matchedVoice = if (isMale) {
+                availableVoices?.firstOrNull { v ->
+                    val name = v.name.lowercase()
+                    val lang = v.locale?.language.orEmpty().lowercase()
+                    val isUsOrEn = lang == "en" || lang.startsWith("en")
+                    val isNetworkOrNeural = name.contains("network") || name.contains("neural") || name.contains("iom") || name.contains("m0")
+                    val isMaleVoice = name.contains("male") || name.contains("m0") || name.contains("iom") || name.contains("fenrir") || name.contains("puck")
+                    isUsOrEn && isMaleVoice && isNetworkOrNeural
+                } ?: availableVoices?.firstOrNull { v ->
+                    val name = v.name.lowercase()
+                    val lang = v.locale?.language.orEmpty().lowercase()
+                    (lang == "en" || lang.startsWith("en")) && (name.contains("male") || name.contains("m0"))
+                }
+            } else {
+                availableVoices?.firstOrNull { v ->
+                    val name = v.name.lowercase()
+                    val lang = v.locale?.language.orEmpty().lowercase()
+                    val isUsOrEn = lang == "en" || lang.startsWith("en")
+                    val isNetworkOrNeural = name.contains("network") || name.contains("neural") || name.contains("sfg") || name.contains("iol") || name.contains("tpf")
+                    val isFemale = name.contains("female") || name.contains("f0") || name.contains("aoede") || name.contains("kore") || name.contains("nova") ||
+                            v.features?.contains("female") == true
+                    isUsOrEn && (isFemale || isNetworkOrNeural)
+                } ?: availableVoices?.firstOrNull { v ->
+                    val name = v.name.lowercase()
+                    val lang = v.locale?.language.orEmpty().lowercase()
+                    val isFemale = name.contains("female") || name.contains("f0") || name.contains("sfg") ||
+                            name.contains("rjs") || name.contains("aoede") || name.contains("kore") || name.contains("nova") ||
+                            v.features?.contains("female") == true
+                    (lang == "en" || lang.startsWith("en")) && isFemale
+                } ?: availableVoices?.firstOrNull { v ->
+                    val lang = v.locale?.language.orEmpty().lowercase()
+                    lang == "en" && !v.name.lowercase().contains("male")
+                }
             }
 
-            if (highQualityFemaleVoice != null) {
-                tts?.voice = highQualityFemaleVoice
-                Log.d(TAG, "Selected TTS Female Voice: ${highQualityFemaleVoice.name}")
+            if (matchedVoice != null) {
+                tts?.voice = matchedVoice
+                Log.d(TAG, "Selected TTS Natural Voice: ${matchedVoice.name} (${voiceConfig.displayName})")
             }
 
-            tts?.setPitch(femaleVoiceConfig.pitch)
-            tts?.setSpeechRate(femaleVoiceConfig.speed)
+            tts?.setPitch(voiceConfig.pitch)
+            tts?.setSpeechRate(voiceConfig.speed)
 
             tts?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {
@@ -275,19 +309,15 @@ class VoiceAssistantRepository(
         _mapsGroundingEnabled.value = enabled
     }
 
+    fun setNaturalVoice(voice: GeminiNaturalVoice) {
+        setGeminiFemaleVoice(voice)
+    }
+
     fun speak(text: String) {
         if (isTtsReady && tts != null) {
             _isSpeaking.value = true
             startWaveformAnimation()
-            // Clean emojis, symbols, and formatting for natural human-sounding conversation
-            val spokenText = text
-                .replace(Regex("[\\p{So}\\p{Cn}]"), "") // Strip emoji icons
-                .replace("•", ", ")
-                .replace("|", ", ")
-                .replace(Regex("[*#_`>~]"), "")
-                .replace(Regex("http\\S+"), "online link")
-                .replace(Regex("\\s+"), " ")
-                .trim()
+            val spokenText = com.example.util.NaturalVoiceFormatter.formatForNaturalSpeech(text)
             tts?.speak(spokenText, TextToSpeech.QUEUE_FLUSH, null, "gps_voice_utterance")
         }
     }
@@ -296,6 +326,10 @@ class VoiceAssistantRepository(
         tts?.stop()
         _isSpeaking.value = false
         stopWaveformAnimation()
+    }
+
+    fun clearLiveTranscript() {
+        _sttTranscript.value = ""
     }
 
     fun clearHistory() {
@@ -615,6 +649,136 @@ class VoiceAssistantRepository(
         )
         chatDao.insertMessage(userMessage.toEntity())
 
+        val lower = userText.lowercase()
+
+        // 1. Voice Command: Veo 3 Video Generation
+        val isVeoVideoRequest = (lower.contains("video") && (
+            lower.contains("generate") || lower.contains("create") ||
+            lower.contains("make") || lower.contains("render") ||
+            lower.contains("veo") || lower.contains("simulate")
+        ))
+
+        if (isVeoVideoRequest) {
+            val aspect = if (lower.contains("9:16") || lower.contains("portrait") || lower.contains("vertical")) {
+                VeoAspectRatio.PORTRAIT_9_16
+            } else {
+                VeoAspectRatio.LANDSCAPE_16_9
+            }
+            val cleanPrompt = userText
+                .replace(Regex("(?i)^(?:hey|hi)?\\s*logic[,:.]?\\s*"), "")
+                .replace(Regex("(?i)^(?:please\\s+)?(?:generate|create|make|render|veo)\\s+(?:a\\s+)?(?:16:9|9:16|portrait|landscape)?\\s*video\\s*(?:of|about|for)?\\s*"), "")
+                .trim()
+                .ifBlank { "Automotive powertrain & live ECU diagnostic simulation" }
+
+            val video = generateVeoVideo(prompt = cleanPrompt, aspectRatio = aspect, isVoice = isVoice)
+            _isProcessing.value = false
+            return GeminiGenerationResult(
+                text = "Generated Veo 3 automotive video simulation with model veo-3.1-fast-generate-preview (${aspect.displayName}). Prompt: \"$cleanPrompt\"",
+                modelUsed = "veo-3.1-fast-generate-preview"
+            )
+        }
+
+        // 2. Voice Command: Model Switching
+        if (lower.contains("gemini live") || lower.contains("switch to live") || lower.contains("change to live") || lower.contains("live mode") || lower.contains("live voice")) {
+            _selectedModel.value = GeminiAiModel.LIVE_VOICE
+            startLiveVoiceSession()
+            val reply = "Switched to Gemini Live (gemini-2.5-flash-native-audio-preview-12-2025) for real-time bidirectional voice co-pilot navigation & diagnostics. 🎙️⚡"
+            val assistantMsg = ChatMessage(
+                id = UUID.randomUUID().toString(),
+                sender = ChatSender.ASSISTANT,
+                content = reply,
+                isVoice = isVoice,
+                modelUsed = "gemini-2.5-flash-native-audio-preview-12-2025",
+                personaUsed = _selectedPersona.value.title
+            )
+            chatDao.insertMessage(assistantMsg.toEntity())
+            _isProcessing.value = false
+            if (isVoice) {
+                _liveVoiceState.value = LiveVoiceSessionState.SPEAKING
+                speak(reply)
+            }
+            return GeminiGenerationResult(text = reply, modelUsed = "gemini-2.5-flash-native-audio-preview-12-2025")
+        } else if (lower.contains("switch to pro") || lower.contains("use gemini pro") || lower.contains("complex mode") || lower.contains("pro model")) {
+            _selectedModel.value = GeminiAiModel.PRO_PREVIEW
+            val reply = "Switched to Gemini 3.1 Pro Preview (gemini-3.1-pro-preview) for complex diagnostic reasoning and deep ECU analysis. 🧠⚡"
+            val assistantMsg = ChatMessage(
+                id = UUID.randomUUID().toString(),
+                sender = ChatSender.ASSISTANT,
+                content = reply,
+                isVoice = isVoice,
+                modelUsed = "gemini-3.1-pro-preview",
+                personaUsed = _selectedPersona.value.title
+            )
+            chatDao.insertMessage(assistantMsg.toEntity())
+            _isProcessing.value = false
+            if (isVoice) {
+                _liveVoiceState.value = LiveVoiceSessionState.SPEAKING
+                speak(reply)
+            }
+            return GeminiGenerationResult(text = reply, modelUsed = "gemini-3.1-pro-preview")
+        } else if (lower.contains("switch to flash lite") || lower.contains("fast mode") || lower.contains("speed mode") || lower.contains("lite model")) {
+            _selectedModel.value = GeminiAiModel.FLASH_LITE
+            val reply = "Switched to Gemini 3.1 Flash Lite (gemini-3.1-flash-lite) for ultra-fast instant answers. ⚡💨"
+            val assistantMsg = ChatMessage(
+                id = UUID.randomUUID().toString(),
+                sender = ChatSender.ASSISTANT,
+                content = reply,
+                isVoice = isVoice,
+                modelUsed = "gemini-3.1-flash-lite-preview",
+                personaUsed = _selectedPersona.value.title
+            )
+            chatDao.insertMessage(assistantMsg.toEntity())
+            _isProcessing.value = false
+            if (isVoice) {
+                _liveVoiceState.value = LiveVoiceSessionState.SPEAKING
+                speak(reply)
+            }
+            return GeminiGenerationResult(text = reply, modelUsed = "gemini-3.1-flash-lite-preview")
+        } else if (lower.contains("switch to flash") || lower.contains("general mode") || lower.contains("standard mode")) {
+            _selectedModel.value = GeminiAiModel.FLASH
+            val reply = "Switched to Gemini 3.5 Flash (gemini-3.5-flash) for general tasks, Google Search & Maps Grounding. 🌐📍"
+            val assistantMsg = ChatMessage(
+                id = UUID.randomUUID().toString(),
+                sender = ChatSender.ASSISTANT,
+                content = reply,
+                isVoice = isVoice,
+                modelUsed = "gemini-3.5-flash",
+                personaUsed = _selectedPersona.value.title
+            )
+            chatDao.insertMessage(assistantMsg.toEntity())
+            _isProcessing.value = false
+            if (isVoice) {
+                _liveVoiceState.value = LiveVoiceSessionState.SPEAKING
+                speak(reply)
+            }
+            return GeminiGenerationResult(text = reply, modelUsed = "gemini-3.5-flash")
+        }
+
+        // 3. Voice Command: Grounding routing
+        if (lower.startsWith("search google") || lower.startsWith("google search") || lower.contains("online search") || lower.contains("search for latest")) {
+            _searchGroundingEnabled.value = true
+            if (_selectedModel.value != GeminiAiModel.FLASH) {
+                _selectedModel.value = GeminiAiModel.FLASH
+            }
+        }
+        if (lower.startsWith("find on google maps") || lower.startsWith("google maps") || lower.contains("on maps") || lower.contains("nearest gas station") || lower.contains("nearest ev charger") || lower.contains("closest charger")) {
+            _mapsGroundingEnabled.value = true
+            if (_selectedModel.value != GeminiAiModel.FLASH) {
+                _selectedModel.value = GeminiAiModel.FLASH
+            }
+        }
+
+        // 4. Voice Command: Persona switching
+        if (lower.contains("switch persona to mechanic") || lower.contains("act as mechanic")) {
+            _selectedPersona.value = ChatbotPersona.MECHANIC
+        } else if (lower.contains("switch persona to navigator") || lower.contains("act as navigator")) {
+            _selectedPersona.value = ChatbotPersona.NAVIGATOR
+        } else if (lower.contains("switch persona to cargo") || lower.contains("act as cargo")) {
+            _selectedPersona.value = ChatbotPersona.CARGO
+        } else if (lower.contains("switch persona to tuner") || lower.contains("act as tuner")) {
+            _selectedPersona.value = ChatbotPersona.TUNER
+        }
+
         val currentTelemetryContext = telemetryContextProvider?.invoke()
 
         // Call Gemini Client with multi-turn history, model, persona & grounding
@@ -648,6 +812,34 @@ class VoiceAssistantRepository(
         }
 
         return result
+    }
+
+    suspend fun generateVeoVideo(
+        prompt: String,
+        aspectRatio: VeoAspectRatio = VeoAspectRatio.LANDSCAPE_16_9,
+        isVoice: Boolean = false
+    ): VeoVideoGeneration {
+        _isGeneratingVeo.value = true
+        val video = GeminiClient.generateVeoVideo(prompt, aspectRatio)
+        _veoVideos.value = listOf(video) + _veoVideos.value
+
+        val assistantMsg = ChatMessage(
+            id = UUID.randomUUID().toString(),
+            sender = ChatSender.ASSISTANT,
+            content = "🎬 Generated Veo 3 video simulation using model veo-3.1-fast-generate-preview (${aspectRatio.displayName}). Prompt: \"$prompt\"",
+            isVoice = isVoice,
+            modelUsed = "veo-3.1-fast-generate-preview",
+            personaUsed = _selectedPersona.value.title,
+            veoVideo = video
+        )
+        chatDao.insertMessage(assistantMsg.toEntity())
+        _isGeneratingVeo.value = false
+
+        if (isVoice) {
+            _liveVoiceState.value = LiveVoiceSessionState.SPEAKING
+            speak("Generated your Veo 3 simulation video in ${aspectRatio.displayName}.")
+        }
+        return video
     }
 
     private fun startWaveformAnimation(highEnergy: Boolean = false) {

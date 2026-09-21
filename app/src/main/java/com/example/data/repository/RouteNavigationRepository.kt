@@ -1,22 +1,28 @@
 package com.example.data.repository
 
+import com.example.data.local.DataStoreManager
 import com.example.data.local.RouteDao
 import com.example.data.model.RouteOption
 import com.example.data.model.RouteSuggestionType
 import com.example.data.model.SavedRouteRecord
 import com.example.data.model.TrafficIncident
 import com.example.data.remote.GeminiClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 class RouteNavigationRepository(
-    private val routeDao: RouteDao
+    private val routeDao: RouteDao,
+    private val dataStoreManager: DataStoreManager? = null
 ) {
     val savedRoutes: Flow<List<SavedRouteRecord>> = routeDao.getAllSavedRoutes()
+    val cachedOfflineRoutes: Flow<List<RouteOption>>? = dataStoreManager?.cachedRoutesFlow
 
     private val _isNavigating = MutableStateFlow(false)
     val isNavigating: StateFlow<Boolean> = _isNavigating.asStateFlow()
@@ -149,12 +155,23 @@ class RouteNavigationRepository(
         _isNavigating.value = true
         _currentNavStep.value = 0
         _liveRerouteSuggestion.value = null
+        // Cache active navigation route into DataStore for offline recovery
+        dataStoreManager?.let { dsm ->
+            CoroutineScope(Dispatchers.IO).launch {
+                dsm.cacheRoute(route)
+            }
+        }
     }
 
     fun stopNavigation() {
         _isNavigating.value = false
         _activeRoute.value = null
         _liveRerouteSuggestion.value = null
+        dataStoreManager?.let { dsm ->
+            CoroutineScope(Dispatchers.IO).launch {
+                dsm.setActiveRouteId(null)
+            }
+        }
     }
 
     fun nextStep() {
@@ -173,12 +190,18 @@ class RouteNavigationRepository(
         _liveRerouteSuggestion.value = null
         val currentRoute = _activeRoute.value
         if (currentRoute != null) {
-            _activeRoute.value = currentRoute.copy(
+            val updated = currentRoute.copy(
                 name = "${currentRoute.name} (Bypass Applied)",
                 durationMinutes = (currentRoute.durationMinutes - 5).coerceAtLeast(15),
                 trafficDelayMinutes = 0,
                 trafficLevel = "Clear"
             )
+            _activeRoute.value = updated
+            dataStoreManager?.let { dsm ->
+                CoroutineScope(Dispatchers.IO).launch {
+                    dsm.cacheRoute(updated)
+                }
+            }
         }
     }
 
@@ -197,5 +220,11 @@ class RouteNavigationRepository(
                 fuelSaved = "${route.fuelSavingsPercent}%"
             )
         )
+        // Also cache route into DataStore for offline GPS access
+        dataStoreManager?.cacheRoute(route)
+    }
+
+    suspend fun cacheCalculatedRoutes(routes: List<RouteOption>) {
+        dataStoreManager?.saveCachedRoutes(routes)
     }
 }

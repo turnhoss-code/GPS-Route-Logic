@@ -33,5 +33,17 @@ class ExampleUnitTest {
 
         assertTrue(result.text.isNotEmpty())
     }
+
+    @Test
+    fun testVeoVideoGeneration() = runBlocking {
+        val video = GeminiClient.generateVeoVideo(
+            prompt = "DTC P0300 cylinder 3 misfire 3D CAD simulation",
+            aspectRatio = com.example.data.model.VeoAspectRatio.LANDSCAPE_16_9
+        )
+        assertNotNull(video)
+        assertEquals("veo-3.1-fast-generate-preview", video.model)
+        assertEquals(com.example.data.model.VeoAspectRatio.LANDSCAPE_16_9, video.aspectRatio)
+        assertEquals(com.example.data.model.VeoGenerationStatus.READY, video.status)
+    }
 }
 

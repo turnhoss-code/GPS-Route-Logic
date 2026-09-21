@@ -2,6 +2,7 @@ package com.example.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -248,29 +249,41 @@ enum class GeminiAiModel(
     val description: String,
     val badge: String
 ) {
-    PRO_PREVIEW(
-        id = "gemini-3.1-pro-preview",
-        displayName = "gemini-3.1-pro-preview",
-        description = "Advanced reasoning for complex ECU diagnostics & multi-stop route mathematics",
-        badge = "Complex Tasks"
+    LIVE_3_8(
+        id = "gemini-3.8-live",
+        displayName = "gemini-3.8-live",
+        description = "Next-gen Live API for real-time bidirectional voice conversation",
+        badge = "Live API"
+    ),
+    LIVE_VOICE(
+        id = "gemini-2.5-flash-native-audio-preview-12-2025",
+        displayName = "gemini-2.5-flash-native-audio",
+        description = "Native audio preview for conversational driving co-pilot",
+        badge = "Gemini Audio"
+    ),
+    FLASH_3_8(
+        id = "models/gemini-3.8-flash",
+        displayName = "models/gemini-3.8-flash",
+        description = "Next-gen multimodal intelligence with high-speed natural response generation",
+        badge = "Gemini 3.8 Flash"
     ),
     FLASH(
         id = "gemini-3.5-flash",
         displayName = "gemini-3.5-flash",
-        description = "Latest free Gemini model for lightning-fast real-time chat, Google Search & Maps Grounding",
-        badge = "Latest Free Model"
+        description = "Standard Gemini model for general tasks & real-time chat with Google Search/Maps",
+        badge = "General Tasks"
+    ),
+    PRO_PREVIEW(
+        id = "gemini-3.1-pro-preview",
+        displayName = "gemini-3.1-pro-preview",
+        description = "Advanced reasoning for particularly complex tasks & deep diagnostics",
+        badge = "Complex Tasks"
     ),
     FLASH_LITE(
-        id = "gemini-3.1-flash-lite-preview",
+        id = "gemini-3.1-flash-lite",
         displayName = "gemini-3.1-flash-lite",
-        description = "High-speed latency for instant quick answers & DTC definitions",
+        description = "Fast-executing lightweight model for tasks that should happen fast",
         badge = "Ultra Fast"
-    ),
-    LIVE_VOICE(
-        id = "gemini-3.1-flash-live-preview",
-        displayName = "gemini-3.1-flash-live-preview (Live API)",
-        description = "Real-time bidirectional audio & conversational voice co-pilot",
-        badge = "Live Voice API"
     )
 }
 
@@ -297,8 +310,38 @@ enum class ChatbotPersona(
         shortName = "Cargo Specialist",
         iconName = "LocalShipping",
         systemInstruction = "You are a commercial fleet logistics and heavy cargo route optimizer. Recommend safe routes, bridge clearances, and eco routes based on trip logs. Always give short, concise answers with emojis 🚚📦⚡."
+    ),
+    TUNER(
+        title = "High-Performance ECU & Dyno Engineer",
+        shortName = "ECU Tuner",
+        iconName = "ElectricBolt",
+        systemInstruction = "You are a high-performance automotive powertrain and ECU tuning specialist. Analyze boost, AFR, timing curves, and high-performance telemetry. Always give short, concise answers with emojis ⚡🏎️🔧."
     )
 }
+
+enum class VeoAspectRatio(val displayName: String, val ratioString: String, val isLandscape: Boolean) {
+    LANDSCAPE_16_9("16:9 Landscape", "16:9", true),
+    PORTRAIT_9_16("9:16 Portrait", "9:16", false)
+}
+
+enum class VeoGenerationStatus {
+    GENERATING,
+    READY,
+    FAILED
+}
+
+data class VeoVideoGeneration(
+    val id: String,
+    val prompt: String,
+    val model: String = "veo-3.1-fast-generate-preview",
+    val aspectRatio: VeoAspectRatio = VeoAspectRatio.LANDSCAPE_16_9,
+    val status: VeoGenerationStatus = VeoGenerationStatus.READY,
+    val durationSeconds: Int = 6,
+    val videoTitle: String = "Automotive Video Simulation",
+    val previewStyle: String = "CYBERPUNK_TELEMETRY",
+    val progressPercent: Int = 100,
+    val timestamp: Long = System.currentTimeMillis()
+)
 
 data class GroundingCitation(
     val title: String,
@@ -337,7 +380,8 @@ data class ChatMessage(
     val personaUsed: String? = null,
     val searchCitations: List<GroundingCitation> = emptyList(),
     val groundedPlaces: List<GroundedMapPlace> = emptyList(),
-    val searchQueries: List<String> = emptyList()
+    val searchQueries: List<String> = emptyList(),
+    val veoVideo: VeoVideoGeneration? = null
 ) {
     fun toEntity(): ChatMessageEntity {
         val citationsArr = JSONArray()
@@ -367,6 +411,21 @@ data class ChatMessage(
             queriesArr.put(q)
         }
 
+        val veoJsonStr = veoVideo?.let { v ->
+            val vObj = JSONObject()
+            vObj.put("id", v.id)
+            vObj.put("prompt", v.prompt)
+            vObj.put("model", v.model)
+            vObj.put("aspectRatio", v.aspectRatio.name)
+            vObj.put("status", v.status.name)
+            vObj.put("durationSeconds", v.durationSeconds)
+            vObj.put("videoTitle", v.videoTitle)
+            vObj.put("previewStyle", v.previewStyle)
+            vObj.put("progressPercent", v.progressPercent)
+            vObj.put("timestamp", v.timestamp)
+            vObj.toString()
+        }
+
         return ChatMessageEntity(
             id = id,
             sender = sender.name,
@@ -378,7 +437,8 @@ data class ChatMessage(
             personaUsed = personaUsed,
             citationsJson = citationsArr.toString(),
             placesJson = placesArr.toString(),
-            searchQueriesJson = queriesArr.toString()
+            searchQueriesJson = queriesArr.toString(),
+            veoJson = veoJsonStr
         )
     }
 }
@@ -395,7 +455,8 @@ data class ChatMessageEntity(
     val personaUsed: String? = null,
     val citationsJson: String = "[]",
     val placesJson: String = "[]",
-    val searchQueriesJson: String = "[]"
+    val searchQueriesJson: String = "[]",
+    val veoJson: String? = null
 ) {
     fun toChatMessage(): ChatMessage {
         val parsedCitations = mutableListOf<GroundingCitation>()
@@ -440,6 +501,36 @@ data class ChatMessageEntity(
             }
         } catch (_: Throwable) {}
 
+        val parsedVeo = veoJson?.let { str ->
+            try {
+                val obj = JSONObject(str)
+                val aspect = try {
+                    VeoAspectRatio.valueOf(obj.optString("aspectRatio", "LANDSCAPE_16_9"))
+                } catch (_: Throwable) {
+                    VeoAspectRatio.LANDSCAPE_16_9
+                }
+                val stat = try {
+                    VeoGenerationStatus.valueOf(obj.optString("status", "READY"))
+                } catch (_: Throwable) {
+                    VeoGenerationStatus.READY
+                }
+                VeoVideoGeneration(
+                    id = obj.optString("id", UUID.randomUUID().toString()),
+                    prompt = obj.optString("prompt", ""),
+                    model = obj.optString("model", "veo-3.1-fast-generate-preview"),
+                    aspectRatio = aspect,
+                    status = stat,
+                    durationSeconds = obj.optInt("durationSeconds", 6),
+                    videoTitle = obj.optString("videoTitle", "Automotive Video Simulation"),
+                    previewStyle = obj.optString("previewStyle", "CYBERPUNK_TELEMETRY"),
+                    progressPercent = obj.optInt("progressPercent", 100),
+                    timestamp = obj.optLong("timestamp", System.currentTimeMillis())
+                )
+            } catch (_: Throwable) {
+                null
+            }
+        }
+
         val chatSender = try {
             ChatSender.valueOf(sender)
         } catch (_: Throwable) {
@@ -457,7 +548,8 @@ data class ChatMessageEntity(
             personaUsed = personaUsed,
             searchCitations = parsedCitations,
             groundedPlaces = parsedPlaces,
-            searchQueries = parsedQueries
+            searchQueries = parsedQueries,
+            veoVideo = parsedVeo
         )
     }
 }

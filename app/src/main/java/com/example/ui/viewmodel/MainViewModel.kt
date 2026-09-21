@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.auth.AuthManager
 import com.example.data.local.AppDatabase
+import com.example.data.local.DataStoreManager
 import com.example.data.model.BillingPeriod
 import com.example.data.model.ChatMessage
 import com.example.data.model.ChatbotPersona
@@ -23,6 +24,8 @@ import com.example.data.model.SubscriptionTier
 import com.example.data.model.TripLog
 import com.example.data.model.UserAccount
 import com.example.data.model.VehicleProfile
+import com.example.data.model.VeoAspectRatio
+import com.example.data.model.VeoVideoGeneration
 import com.example.data.remote.FirestoreRepository
 import com.example.data.remote.GeminiClient
 import com.example.data.repository.DiagnosticsRepository
@@ -47,6 +50,7 @@ enum class AppTab(val title: String) {
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getInstance(application)
+    val dataStoreManager = DataStoreManager(application)
     val authManager = AuthManager(application)
     val firestoreRepo = FirestoreRepository()
     val diagnosticsRepo = DiagnosticsRepository(
@@ -56,7 +60,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         db.damageDao(),
         db.tripLogDao()
     )
-    val routeRepo = RouteNavigationRepository(db.routeDao())
+    val routeRepo = RouteNavigationRepository(db.routeDao(), dataStoreManager)
     val voiceRepo = VoiceAssistantRepository(application, authManager, db.chatDao())
 
     // Current Tab - Default to Gemini Live Voice Chat on app start-up
@@ -125,8 +129,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val currentNavStep: StateFlow<Int> = routeRepo.currentNavStep
     val activeNavRoute: StateFlow<RouteOption?> = routeRepo.activeRoute
     val liveRerouteAlert: StateFlow<String?> = routeRepo.liveRerouteSuggestion
+
+    // Floating Co-Pilot HUD Overlay States
+    private val _isHudOverlayEnabled = MutableStateFlow(true)
+    val isHudOverlayEnabled: StateFlow<Boolean> = _isHudOverlayEnabled.asStateFlow()
+
+    private val _isHudMinimized = MutableStateFlow(false)
+    val isHudMinimized: StateFlow<Boolean> = _isHudMinimized.asStateFlow()
+
     val savedRoutes: StateFlow<List<SavedRouteRecord>> = routeRepo.savedRoutes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val cachedOfflineRoutes: StateFlow<List<RouteOption>> = dataStoreManager.cachedRoutesFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DataStoreManager.DEFAULT_OFFLINE_ROUTES)
 
     // Garage & Vehicles
     val vehicles: StateFlow<List<VehicleProfile>> = diagnosticsRepo.vehicles
@@ -151,6 +165,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val sttError: StateFlow<String?> = voiceRepo.sttError
     val isOpenMicEnabled: StateFlow<Boolean> = voiceRepo.isOpenMicEnabled
     val wakeWordDetected: StateFlow<String?> = voiceRepo.wakeWordDetected
+
+    // Veo 3 Video Generation State
+    val veoVideos: StateFlow<List<VeoVideoGeneration>> = voiceRepo.veoVideos
+    val isGeneratingVeo: StateFlow<Boolean> = voiceRepo.isGeneratingVeo
 
     // Ad Simulation
     private val _showAdRewardDialog = MutableStateFlow(false)
@@ -236,6 +254,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setGeminiModel(model: GeminiAiModel) {
         voiceRepo.setModel(model)
+        if (model == GeminiAiModel.LIVE_VOICE || model == GeminiAiModel.LIVE_3_8) {
+            voiceRepo.startLiveVoiceSession()
+        }
+    }
+
+    fun changeToGeminiLive() {
+        _currentTab.value = AppTab.VOICE
+        voiceRepo.setModel(GeminiAiModel.LIVE_3_8)
+        voiceRepo.startLiveVoiceSession()
     }
 
     fun setChatPersona(persona: ChatbotPersona) {
@@ -283,6 +310,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         voiceRepo.stopSpeaking()
     }
 
+    fun clearLiveTranscript() {
+        voiceRepo.clearLiveTranscript()
+    }
+
     fun clearChatHistory() {
         voiceRepo.clearHistory()
     }
@@ -305,9 +336,104 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun processNavigationVoiceCommand(command: String) {
+        val lower = command.lowercase()
+        when {
+            lower.contains("start") && (lower.contains("nav") || lower.contains("guidance")) -> {
+                startNavigating()
+                voiceRepo.speak("Starting GPS guidance. Fasten your seatbelt.")
+            }
+            lower.contains("stop") && (lower.contains("nav") || lower.contains("guidance") || lower.contains("cancel")) -> {
+                stopNavigating()
+                voiceRepo.speak("GPS guidance ended.")
+            }
+            lower.contains("reroute") || lower.contains("bypass") || lower.contains("alternate") -> {
+                if (liveRerouteAlert.value != null) {
+                    acceptReroute()
+                    voiceRepo.speak("Bypass accepted. Rerouting map to clear traffic.")
+                } else {
+                    // Pick the fastest or scenic alternate
+                    val alt = routeOptions.value.firstOrNull { it.id != selectedRoute.value?.id }
+                    if (alt != null) {
+                        selectRoute(alt)
+                        voiceRepo.speak("Switched to ${alt.name}. Saves time with optimal OBD telemetry.")
+                    } else {
+                        calculateRoutes()
+                        voiceRepo.speak("Recalculating alternative routes with live highway data.")
+                    }
+                }
+            }
+            lower.contains("next") || lower.contains("step") || lower.contains("maneuver") -> {
+                nextNavStep()
+                val currentStepText = routeRepo.turnByTurnSteps.getOrElse(currentNavStep.value) { "Arrived" }
+                voiceRepo.speak("Next turn: $currentStepText")
+            }
+            lower.contains("repeat") || lower.contains("where do i turn") || lower.contains("current turn") || lower.contains("what is next") || lower.contains("turn instruction") -> {
+                speakCurrentTurnInstruction()
+            }
+            lower.contains("minimize hud") || lower.contains("collapse hud") || lower.contains("hide hud") -> {
+                toggleHudMinimized(true)
+                voiceRepo.speak("Co-Pilot HUD minimized to compact mode.")
+            }
+            lower.contains("expand hud") || lower.contains("show hud") || lower.contains("open hud") -> {
+                toggleHudMinimized(false)
+                toggleHudOverlay(true)
+                voiceRepo.speak("Co-Pilot HUD expanded with full telemetry.")
+            }
+            lower.contains("save") && lower.contains("route") -> {
+                saveCurrentRoute()
+                voiceRepo.speak("Route successfully saved to local garage cache.")
+            }
+            else -> {
+                // Route through the Gemini Automotive Specialist
+                executeVoiceCommand(command)
+            }
+        }
+    }
+
     fun sendChatMessage(text: String, isVoice: Boolean = false) {
+        val lower = text.lowercase()
+        // Voice switching commands
+        when {
+            lower.contains("aoede") || (lower.contains("female") && (lower.contains("voice") || lower.contains("natural"))) -> {
+                setFemaleVoice(com.example.data.repository.GeminiFemaleVoice.AOEDE)
+            }
+            lower.contains("kore") -> {
+                setFemaleVoice(com.example.data.repository.GeminiFemaleVoice.KORE)
+            }
+            lower.contains("nova") -> {
+                setFemaleVoice(com.example.data.repository.GeminiFemaleVoice.NOVA)
+            }
+            lower.contains("fenrir") -> {
+                setFemaleVoice(com.example.data.repository.GeminiFemaleVoice.FENRIR)
+            }
+            lower.contains("puck") -> {
+                setFemaleVoice(com.example.data.repository.GeminiFemaleVoice.PUCK)
+            }
+        }
+        // Model dynamic switching commands
+        when {
+            lower.contains("3.8-live") || (lower.contains("live") && lower.contains("3.8")) || lower.contains("live api") -> {
+                setGeminiModel(GeminiAiModel.LIVE_3_8)
+            }
+            lower.contains("3.1-pro") || lower.contains("complex") -> {
+                setGeminiModel(GeminiAiModel.PRO_PREVIEW)
+            }
+            lower.contains("3.5-flash") || lower.contains("general") -> {
+                setGeminiModel(GeminiAiModel.FLASH)
+            }
+            lower.contains("3.1-flash-lite") || lower.contains("flash lite") || lower.contains("fast") -> {
+                setGeminiModel(GeminiAiModel.FLASH_LITE)
+            }
+        }
         viewModelScope.launch {
             voiceRepo.sendQuery(text, isVoice)
+        }
+    }
+
+    fun generateVeoVideo(prompt: String, aspectRatio: VeoAspectRatio = VeoAspectRatio.LANDSCAPE_16_9) {
+        viewModelScope.launch {
+            voiceRepo.generateVeoVideo(prompt, aspectRatio, isVoice = false)
         }
     }
 
@@ -349,10 +475,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _routeOptions.value = options
             _selectedRoute.value = options.firstOrNull()
 
+            // Cache calculated routes in DataStore for offline GPS access
+            routeRepo.cacheCalculatedRoutes(options)
+
             // Generate AI Traffic advice
             val prompt = "Analyze traffic and route choices from ${_originInput.value} to ${_destinationInput.value}. Summarize incident delays and recommend the best departure window."
             val advice = GeminiClient.generateAiText(prompt)
             _aiTrafficAdvice.value = advice
+        }
+    }
+
+    fun loadOfflineCachedRoutes() {
+        viewModelScope.launch {
+            val cached = cachedOfflineRoutes.value
+            if (cached.isNotEmpty()) {
+                _routeOptions.value = cached
+                _selectedRoute.value = cached.firstOrNull()
+            }
+        }
+    }
+
+    fun cacheRouteToDataStore(route: RouteOption) {
+        viewModelScope.launch {
+            dataStoreManager.cacheRoute(route)
         }
     }
 
@@ -365,8 +510,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         routeRepo.startNavigation(target)
     }
 
+    fun toggleHudOverlay(enabled: Boolean? = null) {
+        _isHudOverlayEnabled.value = enabled ?: !_isHudOverlayEnabled.value
+    }
+
+    fun toggleHudMinimized(minimized: Boolean? = null) {
+        _isHudMinimized.value = minimized ?: !_isHudMinimized.value
+    }
+
+    fun speakCurrentTurnInstruction() {
+        val currentStep = currentNavStep.value
+        val stepText = routeRepo.turnByTurnSteps.getOrElse(currentStep) { "You have reached your destination." }
+        voiceRepo.speak("Turn-by-turn guidance: $stepText")
+    }
+
     fun startNavigating(route: RouteOption? = null) {
         startNavigation(route)
+        _isHudOverlayEnabled.value = true
+        _isHudMinimized.value = false
+        val firstStep = routeRepo.turnByTurnSteps.firstOrNull() ?: "Proceed to highlighted route"
+        voiceRepo.speak("Starting GPS guidance with Co-Pilot HUD. Next instruction: $firstStep")
     }
 
     fun stopNavigation() {
@@ -375,14 +538,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stopNavigating() {
         routeRepo.stopNavigation()
+        voiceRepo.speak("GPS guidance ended.")
     }
 
     fun advanceNavStep() {
         routeRepo.nextStep()
+        val stepText = routeRepo.turnByTurnSteps.getOrElse(currentNavStep.value) { "Destination arrived." }
+        voiceRepo.speak(stepText)
     }
 
     fun nextNavStep() {
-        routeRepo.nextStep()
+        advanceNavStep()
     }
 
     fun acceptReroute() {

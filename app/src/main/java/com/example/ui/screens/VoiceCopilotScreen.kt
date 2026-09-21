@@ -52,6 +52,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.LocationOn
@@ -63,6 +64,16 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.runtime.mutableFloatStateOf
+import com.example.data.model.VeoAspectRatio
+import com.example.data.model.VeoGenerationStatus
+import com.example.data.model.VeoVideoGeneration
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -147,6 +158,9 @@ fun VoiceCopilotScreen(
     val isOpenMicEnabled by viewModel.isOpenMicEnabled.collectAsState()
     val wakeWordDetected by viewModel.wakeWordDetected.collectAsState()
 
+    val veoVideos by viewModel.veoVideos.collectAsState()
+    val isGeneratingVeo by viewModel.isGeneratingVeo.collectAsState()
+
     var textInput by remember { mutableStateOf("") }
     var selectedCopilotMode by remember { mutableIntStateOf(1) } // 0: Multi-Turn Chat, 1: Live Voice API (Default to Live Voice)
     var showManualSttDialog by remember { mutableStateOf(false) }
@@ -166,13 +180,19 @@ fun VoiceCopilotScreen(
     }
 
     val quickPrompts = listOf(
+        "Use female Gemini voice Aoede 🎙️",
+        "Use female Gemini voice Nova (Dynamic) ⚡",
+        "Use female Gemini voice Kore (Diagnostic) 🔧",
+        "Use gemini-3.8-live (Live API) 🎙️",
+        "Switch to gemini-3.1-pro-preview 🧠",
+        "Switch to gemini-3.5-flash ⚡",
+        "Switch to gemini-3.1-flash-lite 🚀",
         "Scan OBD codes from ELM327 BLE ⚡",
         "Recommend alternate route based on damage score & trip logs 🛡️",
         "What is my current engine status & coolant temp? 🚗",
         "Current location GPS directions & traffic detours 📍",
         "Explain DTC P0300 misfire cause & estimated repair cost 🔧",
-        "Explain DTC P0420 catalyst efficiency & fix 🛠️",
-        "Analyze trip logs & road surface wear scores 📊"
+        "Explain DTC P0420 catalyst efficiency & fix 🛠️"
     )
 
     LaunchedEffect(messages.size) {
@@ -343,65 +363,105 @@ fun VoiceCopilotScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.GraphicEq, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Live Voice Co-Pilot (Live API)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Gemini Live Co-Pilot", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 },
                 selectedContentColor = SpeedGreen,
                 unselectedContentColor = Color(0xFF8D99AE)
             )
+            Tab(
+                selected = selectedCopilotMode == 2,
+                onClick = { selectedCopilotMode = 2 },
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Videocam, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Veo 3 Studio", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                },
+                selectedContentColor = ElectricBlue,
+                unselectedContentColor = Color(0xFF8D99AE)
+            )
         }
 
-        if (selectedCopilotMode == 1) {
-            // Live Voice Co-Pilot Screen (gemini-3.1-flash-live-preview)
-            LiveVoiceCopilotView(
-                viewModel = viewModel,
-                liveVoiceState = liveVoiceState,
-                waveformEnergy = waveformEnergy,
-                liveTranscript = liveTranscript,
-                isSpeaking = isSpeaking,
-                isProcessing = isProcessing,
-                isOpenMicEnabled = isOpenMicEnabled,
-                wakeWordDetected = wakeWordDetected
-            )
-        } else {
-            // Multi-Turn Chatbot Screen
-            MultiTurnChatbotView(
-                viewModel = viewModel,
-                messages = messages,
-                selectedModel = selectedModel,
-                selectedPersona = selectedPersona,
-                searchGrounding = searchGrounding,
-                mapsGrounding = mapsGrounding,
-                isProcessing = isProcessing,
-                isSttListening = isSttListening,
-                textInput = textInput,
-                onTextInputChange = { textInput = it },
-                onStartStt = {
-                    val hasRecordPerm = ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.RECORD_AUDIO
-                    ) == PackageManager.PERMISSION_GRANTED
+        when (selectedCopilotMode) {
+            1 -> {
+                // Live Voice Co-Pilot Screen (gemini-3.1-flash-live-preview)
+                LiveVoiceCopilotView(
+                    viewModel = viewModel,
+                    liveVoiceState = liveVoiceState,
+                    waveformEnergy = waveformEnergy,
+                    liveTranscript = liveTranscript,
+                    isSpeaking = isSpeaking,
+                    isProcessing = isProcessing,
+                    isOpenMicEnabled = isOpenMicEnabled,
+                    wakeWordDetected = wakeWordDetected
+                )
+            }
+            2 -> {
+                // Veo 3 Video Studio (veo-3.1-fast-generate-preview)
+                VeoStudioView(
+                    viewModel = viewModel,
+                    veoVideos = veoVideos,
+                    isGeneratingVeo = isGeneratingVeo,
+                    onStartStt = {
+                        val hasRecordPerm = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED
 
-                    if (hasRecordPerm) {
-                        showManualSttDialog = true
-                        viewModel.startSpeechToText { recognizedText ->
-                            showManualSttDialog = false
-                            viewModel.sendChatMessage(recognizedText, isVoice = true)
+                        if (hasRecordPerm) {
+                            showManualSttDialog = true
+                            viewModel.startSpeechToText { recognizedText ->
+                                showManualSttDialog = false
+                                viewModel.generateVeoVideo(recognizedText)
+                            }
+                        } else {
+                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }
-                    } else {
-                        audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     }
-                },
-                onSend = {
-                    if (textInput.isNotBlank()) {
-                        viewModel.sendChatMessage(textInput, isVoice = false)
-                        textInput = ""
-                    }
-                },
-                quickPrompts = quickPrompts,
-                listState = listState,
-                userRemainingTokens = if (user.tier.chatTokensPerDay == -1) "Unlimited" else "${(user.tier.chatTokensPerDay - user.chatTokensUsedToday).coerceAtLeast(0)} left"
-            )
+                )
+            }
+            else -> {
+                // Multi-Turn Chatbot Screen
+                MultiTurnChatbotView(
+                    viewModel = viewModel,
+                    messages = messages,
+                    selectedModel = selectedModel,
+                    selectedPersona = selectedPersona,
+                    searchGrounding = searchGrounding,
+                    mapsGrounding = mapsGrounding,
+                    isProcessing = isProcessing,
+                    isSttListening = isSttListening,
+                    textInput = textInput,
+                    onTextInputChange = { textInput = it },
+                    onStartStt = {
+                        val hasRecordPerm = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                        if (hasRecordPerm) {
+                            showManualSttDialog = true
+                            viewModel.startSpeechToText { recognizedText ->
+                                showManualSttDialog = false
+                                viewModel.sendChatMessage(recognizedText, isVoice = true)
+                            }
+                        } else {
+                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    },
+                    onSend = {
+                        if (textInput.isNotBlank()) {
+                            viewModel.sendChatMessage(textInput, isVoice = false)
+                            textInput = ""
+                        }
+                    },
+                    quickPrompts = quickPrompts,
+                    listState = listState,
+                    userRemainingTokens = if (user.tier.chatTokensPerDay == -1) "Unlimited" else "${(user.tier.chatTokensPerDay - user.chatTokensUsedToday).coerceAtLeast(0)} left"
+                )
+            }
         }
     }
 }
@@ -502,6 +562,7 @@ fun MultiTurnChatbotView(
                                         ChatbotPersona.MECHANIC -> Icons.Default.Build
                                         ChatbotPersona.NAVIGATOR -> Icons.Default.Navigation
                                         ChatbotPersona.CARGO -> Icons.Default.LocalShipping
+                                        ChatbotPersona.TUNER -> Icons.Default.ElectricBolt
                                     },
                                     contentDescription = null,
                                     modifier = Modifier.size(14.dp)
@@ -538,14 +599,14 @@ fun MultiTurnChatbotView(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.padding(vertical = 4.dp).testTag("model_selector_row")
                 ) {
-                    items(listOf(GeminiAiModel.FLASH, GeminiAiModel.PRO_PREVIEW, GeminiAiModel.FLASH_LITE)) { model ->
+                    items(com.example.data.model.GeminiAiModel.values()) { model ->
                         val isSelected = model == selectedModel
                         FilterChip(
                             selected = isSelected,
                             onClick = { viewModel.setGeminiModel(model) },
                             label = {
                                 Column {
-                                    Text(model.id, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text(model.displayName, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     Text(model.badge, fontSize = 9.sp, color = if (isSelected) NeonCyan else Color(0xFF8D99AE))
                                 }
                             },
@@ -564,25 +625,65 @@ fun MultiTurnChatbotView(
                     }
                 }
 
-                // Gemini Female Voice Selector
+                // Active Model Description & Model Task Guide
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFF101C38),
+                    border = BorderStroke(1.dp, Color(0xFF223565)),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "${selectedModel.displayName}: ${selectedModel.description}",
+                            fontSize = 10.sp,
+                            color = Color(0xFFB0C4DE),
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+
+                // Natural Gemini Voice Selector
                 val currentFemaleVoice by viewModel.selectedFemaleVoice.collectAsState()
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = "GEMINI FEMALE VOICE (TTS)",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF8D99AE),
-                        letterSpacing = 1.sp
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "FEMALE GEMINI VOICE (LIVE & TTS)",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NeonCyan,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            color = SpeedGreen.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(4.dp),
+                            border = BorderStroke(0.5.dp, SpeedGreen)
+                        ) {
+                            Text(
+                                text = "♀ Active: ${currentFemaleVoice.displayName.substringBefore(" ")}",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SpeedGreen,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                     IconButton(
                         onClick = { viewModel.playFemaleVoicePreview(currentFemaleVoice) },
                         modifier = Modifier.size(24.dp).testTag("preview_female_voice_button")
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Test Female Voice", tint = NeonCyan, modifier = Modifier.size(16.dp))
+                        Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Test Natural Voice", tint = SpeedGreen, modifier = Modifier.size(16.dp))
                     }
                 }
 
@@ -595,7 +696,17 @@ fun MultiTurnChatbotView(
                         FilterChip(
                             selected = isSelected,
                             onClick = { viewModel.setFemaleVoice(voice) },
-                            label = { Text(voice.displayName, fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
+                            label = { 
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (voice.gender == "Female") {
+                                            Text("♀ ", fontSize = 11.sp, color = if (isSelected) SpeedGreen else NeonCyan)
+                                        }
+                                        Text(voice.displayName, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                    }
+                                    Text(voice.personaDescription, fontSize = 8.sp, color = if (isSelected) SpeedGreen else Color(0xFF8D99AE))
+                                }
+                            },
                             leadingIcon = {
                                 Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, modifier = Modifier.size(13.dp), tint = if (isSelected) SpeedGreen else Color(0xFF8D99AE))
                             },
@@ -927,6 +1038,22 @@ fun ChatMessageBubble(
                     lineHeight = 19.sp
                 )
 
+                // Veo 3 AI Video Simulation Card
+                if (message.veoVideo != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    VeoVideoCard(
+                        video = message.veoVideo,
+                        onShare = {
+                            val sendIntent = android.content.Intent().apply {
+                                action = android.content.Intent.ACTION_SEND
+                                putExtra(android.content.Intent.EXTRA_TEXT, "Veo 3 AI Simulation: ${message.veoVideo.videoTitle}")
+                                type = "text/plain"
+                            }
+                            context.startActivity(android.content.Intent.createChooser(sendIntent, "Share Simulation Video"))
+                        }
+                    )
+                }
+
                 // Google Search Grounding Citations
                 if (message.searchCitations.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1074,6 +1201,7 @@ fun LiveVoiceCopilotView(
     isOpenMicEnabled: Boolean,
     wakeWordDetected: String?
 ) {
+    val selectedModel by viewModel.selectedGeminiModel.collectAsState()
     val infiniteTransition = rememberInfiniteTransition(label = "live_wave")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.95f,
@@ -1171,10 +1299,10 @@ fun LiveVoiceCopilotView(
                             }
                         }
                         Text(
-                            text = "Model: gemini-3.1-flash-live-preview",
-                            fontSize = 12.sp,
+                            text = "Model: ${selectedModel.displayName}",
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = NeonCyan
                         )
                     }
                 }
@@ -1215,6 +1343,127 @@ fun LiveVoiceCopilotView(
             }
         }
 
+        // Model Selector for Live Voice Mode (gemini-3.8-live, gemini-2.5-flash-native-audio, etc.)
+        Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+            Text(
+                text = "LIVE VOICE MODEL:",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF8D99AE),
+                letterSpacing = 0.8.sp
+            )
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(top = 2.dp).testTag("live_model_selector_row")
+            ) {
+                items(com.example.data.model.GeminiAiModel.values()) { model ->
+                    val isSelected = model == selectedModel
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { viewModel.setGeminiModel(model) },
+                        label = {
+                            Text(
+                                text = "${model.displayName} (${model.badge})",
+                                fontSize = 10.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = SpeedGreen.copy(alpha = 0.25f),
+                            selectedLabelColor = SpeedGreen,
+                            containerColor = Color(0xFF131D38),
+                            labelColor = Color(0xFFB0C4DE)
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = if (isSelected) SpeedGreen else Color(0xFF263868)
+                        )
+                    )
+                }
+            }
+        }
+
+        // Natural Voice Selector Row in Live Voice Mode
+        val currentNaturalVoice by viewModel.selectedFemaleVoice.collectAsState()
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp)
+                .background(Color(0xFF0F1B33), RoundedCornerShape(10.dp))
+                .border(1.dp, NeonCyan.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+                .padding(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "GEMINI FEMALE LIVE VOICE:",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = NeonCyan,
+                        letterSpacing = 0.8.sp
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        color = SpeedGreen.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(4.dp),
+                        border = BorderStroke(0.5.dp, SpeedGreen)
+                    ) {
+                        Text(
+                            text = if (currentNaturalVoice.gender == "Female") "Active Female Voice" else currentNaturalVoice.gender,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SpeedGreen,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = { viewModel.playFemaleVoicePreview(currentNaturalVoice) },
+                    modifier = Modifier.size(24.dp).testTag("preview_live_natural_voice_button")
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Preview Natural Voice", tint = SpeedGreen, modifier = Modifier.size(16.dp))
+                }
+            }
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(top = 4.dp).testTag("live_natural_voice_selector_row")
+            ) {
+                items(com.example.data.repository.GeminiFemaleVoice.values()) { voice ->
+                    val isSelected = voice == currentNaturalVoice
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { viewModel.setFemaleVoice(voice) },
+                        label = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (voice.gender == "Female") {
+                                    Text("♀ ", fontSize = 11.sp, color = if (isSelected) SpeedGreen else NeonCyan)
+                                }
+                                Text(voice.displayName, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = SpeedGreen.copy(alpha = 0.25f),
+                            selectedLabelColor = SpeedGreen,
+                            containerColor = Color(0xFF131D38),
+                            labelColor = Color(0xFFB0C4DE)
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = if (isSelected) SpeedGreen else Color(0xFF263868)
+                        )
+                    )
+                }
+            }
+        }
+
         // Wake Word Active Notification Pill (when detected)
         if (wakeWordDetected != null) {
             Surface(
@@ -1237,7 +1486,7 @@ fun LiveVoiceCopilotView(
         // Visualizer / Waveform Centerpiece with Visual Ripple Animation
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(vertical = 12.dp)
+            modifier = Modifier.padding(vertical = 6.dp)
         ) {
             Box(
                 contentAlignment = Alignment.Center,
@@ -1368,13 +1617,15 @@ fun LiveVoiceCopilotView(
                 Spacer(modifier = Modifier.height(6.dp))
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Text(
                 text = when {
                     isSpeaking -> "GPS Route Logic A.I. is speaking..."
                     isProcessing -> "Gemini Live synthesizing vehicle response..."
                     liveVoiceState == LiveVoiceSessionState.LISTENING -> "🎙️ Open Mic Active • Speak or say 'Hey Logic'..."
+                    liveVoiceState == LiveVoiceSessionState.CONNECTING -> "🔄 Connecting to Gemini Live Session..."
+                    liveVoiceState == LiveVoiceSessionState.ERROR -> "⚠️ Connection issue • Tap reset below to reconnect"
                     isOpenMicEnabled -> "👂 Open Mic Ready • Say 'Hey Logic' or tap orb"
                     liveVoiceState == LiveVoiceSessionState.CONNECTED_IDLE -> "Connected & Ready • Tap Mic to Speak"
                     else -> "Live session disconnected"
@@ -1382,14 +1633,17 @@ fun LiveVoiceCopilotView(
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = when {
+                    liveVoiceState == LiveVoiceSessionState.ERROR -> Color(0xFFEF4444)
                     isSpeaking -> SpeedGreen
                     liveVoiceState == LiveVoiceSessionState.LISTENING -> NeonCyan
+                    liveVoiceState == LiveVoiceSessionState.CONNECTING -> GoldPro
                     else -> Color.White
                 }
             )
         }
 
-        // Live Transcript Box
+        // Live Transcript & Interactive Chat Input Box
+        var liveInputText by remember { mutableStateOf("") }
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF131D3B)),
             border = BorderStroke(1.dp, Color(0xFF263868)),
@@ -1408,19 +1662,77 @@ fun LiveVoiceCopilotView(
                         color = Color(0xFF8D99AE),
                         letterSpacing = 1.sp
                     )
-                    if (isSpeaking) {
-                        IconButton(onClick = { viewModel.stopSpeaking() }, modifier = Modifier.size(24.dp)) {
-                            Icon(Icons.Default.Stop, contentDescription = "Interrupt Voice", tint = Color.Red)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (isSpeaking) {
+                            IconButton(onClick = { viewModel.stopSpeaking() }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Stop, contentDescription = "Interrupt Voice", tint = Color.Red, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                        if (liveTranscript.isNotBlank()) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            IconButton(
+                                onClick = { viewModel.clearLiveTranscript() },
+                                modifier = Modifier.size(24.dp).testTag("clear_live_transcript_button")
+                            ) {
+                                Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Transcript", tint = Color(0xFF8D99AE), modifier = Modifier.size(16.dp))
+                            }
                         }
                     }
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = if (liveTranscript.isNotBlank()) liveTranscript else "Say 'Hey Logic', 'Check engine diagnostics', or 'What's the best route?'",
+                    text = if (liveTranscript.isNotBlank()) liveTranscript else "Say 'Hey Logic', 'Check engine diagnostics', or type below...",
                     fontSize = 13.sp,
                     color = if (liveTranscript.isNotBlank()) Color.White else Color(0xFF6B7280),
                     lineHeight = 18.sp
                 )
+                Spacer(modifier = Modifier.height(10.dp))
+                // Quick text prompt fallback for Live Chat
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = liveInputText,
+                        onValueChange = { liveInputText = it },
+                        placeholder = { Text("Or type to Gemini Live Copilot...", fontSize = 12.sp, color = Color(0xFF6B7280)) },
+                        modifier = Modifier.weight(1f).testTag("live_chat_text_input"),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = SpeedGreen,
+                            unfocusedBorderColor = Color(0xFF263868),
+                            focusedContainerColor = Color(0xFF0D1426),
+                            unfocusedContainerColor = Color(0xFF0D1426),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(
+                        onClick = {
+                            if (liveInputText.isNotBlank()) {
+                                val text = liveInputText
+                                liveInputText = ""
+                                viewModel.stopListeningAndSend(text)
+                            }
+                        },
+                        enabled = liveInputText.isNotBlank() && !isProcessing,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(
+                                if (liveInputText.isNotBlank() && !isProcessing) SpeedGreen else Color(0xFF1E293B),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .testTag("live_chat_send_button")
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Send to Live Copilot",
+                            tint = if (liveInputText.isNotBlank() && !isProcessing) Color.Black else Color.Gray,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
         }
 
@@ -1473,28 +1785,619 @@ fun LiveVoiceCopilotView(
         // Controls Bottom Bar
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Button(
                 onClick = {
-                    if (liveVoiceState == LiveVoiceSessionState.DISCONNECTED) {
+                    if (liveVoiceState == LiveVoiceSessionState.DISCONNECTED || liveVoiceState == LiveVoiceSessionState.ERROR) {
                         viewModel.startLiveVoiceSession()
                     } else {
                         viewModel.stopLiveVoiceSession()
                     }
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (liveVoiceState != LiveVoiceSessionState.DISCONNECTED) Color(0xFF374151) else SpeedGreen
+                    containerColor = when (liveVoiceState) {
+                        LiveVoiceSessionState.DISCONNECTED -> SpeedGreen
+                        LiveVoiceSessionState.ERROR -> Color(0xFFDC2626)
+                        else -> Color(0xFF374151)
+                    }
                 ),
                 modifier = Modifier.weight(1f).testTag("live_voice_toggle_session_button")
             ) {
                 Text(
-                    if (liveVoiceState != LiveVoiceSessionState.DISCONNECTED) "Disconnect Live Session" else "Connect Live Voice API (Open Mic)",
-                    color = if (liveVoiceState != LiveVoiceSessionState.DISCONNECTED) Color.White else Color.Black,
+                    when (liveVoiceState) {
+                        LiveVoiceSessionState.DISCONNECTED -> "Connect Live Voice API (Open Mic)"
+                        LiveVoiceSessionState.ERROR -> "Reset & Reconnect Live Voice ⚠️"
+                        else -> "Disconnect Live Session"
+                    },
+                    color = if (liveVoiceState == LiveVoiceSessionState.DISCONNECTED) Color.Black else Color.White,
                     fontWeight = FontWeight.Bold
                 )
             }
         }
+    }
+}
+
+@Composable
+fun VeoVideoCard(
+    video: VeoVideoGeneration,
+    onShare: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    var isPlaying by remember { mutableStateOf(true) }
+    val infiniteTransition = rememberInfiniteTransition(label = "veo_scan")
+    val scanLineY by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "scanline"
+    )
+
+    // Aspect ratio container: 16:9 or 9:16
+    val aspectRatioValue = if (video.aspectRatio == VeoAspectRatio.LANDSCAPE_16_9) 16f / 9f else 9f / 16f
+
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A1224)),
+        border = BorderStroke(1.dp, Brush.horizontalGradient(listOf(ElectricBlue, NeonCyan))),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .testTag("veo_video_card_${video.id}")
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            // Header: Model Badge & Aspect Ratio
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Videocam,
+                        contentDescription = null,
+                        tint = NeonCyan,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "VEO 3 AI VIDEO",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = NeonCyan,
+                        letterSpacing = 1.sp
+                    )
+                }
+                Surface(
+                    color = Color(0xFF1E3A8A).copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(4.dp),
+                    border = BorderStroke(0.5.dp, NeonCyan)
+                ) {
+                    Text(
+                        text = "${video.aspectRatio.displayName} • veo-3.1-fast-generate-preview",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = video.videoTitle,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Video Canvas with Aspect Ratio
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(aspectRatioValue)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF030712))
+                    .border(1.dp, Color(0xFF1E293B), RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                // Background visual backdrop
+                Image(
+                    painter = painterResource(id = R.drawable.drive_logic_ai_developer_header),
+                    contentDescription = "Video Visual Render",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+
+                // High-tech cyberpunk overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.Black.copy(alpha = 0.35f),
+                                    Color(0xFF0F172A).copy(alpha = 0.7f)
+                                )
+                            )
+                        )
+                )
+
+                // Animated Scanline / Grid effect
+                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                    if (isPlaying) {
+                        val y = size.height * scanLineY
+                        drawLine(
+                            color = androidx.compose.ui.graphics.Color(0xFF00F0FF).copy(alpha = 0.45f),
+                            start = androidx.compose.ui.geometry.Offset(0f, y),
+                            end = androidx.compose.ui.geometry.Offset(size.width, y),
+                            strokeWidth = 2.dp.toPx()
+                        )
+                    }
+                }
+
+                // Simulated Telemetry HUD inside the video player
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Surface(
+                            color = Color.Black.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "● REC [1080p 60FPS]",
+                                fontSize = 9.sp,
+                                color = Color.Red,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        Surface(
+                            color = Color.Black.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "RPM: 3,420 • BOOST: +14.2 PSI",
+                                fontSize = 9.sp,
+                                color = NeonCyan,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    // Center Play/Pause button
+                    IconButton(
+                        onClick = { isPlaying = !isPlaying },
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .size(48.dp)
+                            .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                            .border(1.5.dp, NeonCyan, CircleShape)
+                    ) {
+                        Icon(
+                            if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+
+                    // Bottom Player Controls (Timeline bar & timestamp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = if (isPlaying) "00:03 / 00:06" else "PAUSED",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = video.aspectRatio.ratioString,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SpeedGreen
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                Icons.Default.AspectRatio,
+                                contentDescription = null,
+                                tint = SpeedGreen,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Video Prompt description
+            Text(
+                text = "Prompt: \"${video.prompt}\"",
+                fontSize = 11.sp,
+                color = Color(0xFF94A3B8),
+                lineHeight = 16.sp
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Action Buttons (Share)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    color = Color(0xFF132247),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, Color(0xFF263868)),
+                    modifier = Modifier.clickable { onShare() }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Share Video", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun VeoStudioView(
+    viewModel: MainViewModel,
+    veoVideos: List<VeoVideoGeneration>,
+    isGeneratingVeo: Boolean,
+    onStartStt: () -> Unit
+) {
+    val context = LocalContext.current
+    var promptInput by remember { mutableStateOf("") }
+    var selectedAspectRatio by remember { mutableStateOf(VeoAspectRatio.LANDSCAPE_16_9) }
+
+    val presetPrompts = listOf(
+        "DTC P0300 Cylinder 3 misfire and spark plug ignition failure 3D CAD simulation ⚙️",
+        "EV 800V high-voltage battery thermal cooling loop and liquid manifold flow 🔋",
+        "Severe pothole suspension impact and damper rebound stress telemetry 🛡️",
+        "Twin-scroll turbocharger boost compression and intercooler airflow 💨",
+        "Highway 101 midnight heavy rain autonomous lane tracking with HUD overlay 🌧️",
+        "High-performance dyno 0-60 MPH acceleration pull and torque curve 🏎️"
+    )
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 14.dp)
+            .testTag("veo_studio_screen"),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item { Spacer(modifier = Modifier.height(8.dp)) }
+
+        // Studio Hero Banner
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0C1630)),
+                border = BorderStroke(1.5.dp, Brush.horizontalGradient(listOf(ElectricBlue, NeonCyan))),
+                modifier = Modifier.fillMaxWidth().testTag("veo_studio_header_card")
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(
+                                        Brush.linearGradient(listOf(ElectricBlue, NeonCyan)),
+                                        CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Videocam, contentDescription = null, tint = Color.Black, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    "Veo 3 Video Studio",
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color.White
+                                )
+                                Text(
+                                    "Powered by veo-3.1-fast-generate-preview",
+                                    fontSize = 11.sp,
+                                    color = NeonCyan,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                        Surface(
+                            color = NeonCyan.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(6.dp),
+                            border = BorderStroke(0.5.dp, NeonCyan)
+                        ) {
+                            Text(
+                                "1080p Neural AI",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NeonCyan,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        "Generate high-fidelity automotive video simulations from text or real-time voice commands. Supports 16:9 widescreen and 9:16 portrait mobile formats.",
+                        fontSize = 12.sp,
+                        color = Color(0xFF94A3B8),
+                        lineHeight = 17.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Aspect Ratio Selector
+                    Text(
+                        "ASPECT RATIO FORMAT",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF8D99AE),
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        VeoAspectRatio.values().forEach { ratio ->
+                            val isSelected = ratio == selectedAspectRatio
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) Color(0xFF1E3A8A) else Color(0xFF131D38),
+                                border = BorderStroke(1.dp, if (isSelected) NeonCyan else Color(0xFF263868)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { selectedAspectRatio = ratio }
+                                    .testTag("veo_ratio_${ratio.ratioString.replace(":", "_")}")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.AspectRatio,
+                                        contentDescription = null,
+                                        tint = if (isSelected) NeonCyan else Color(0xFF8D99AE),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = ratio.displayName,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else Color(0xFFB0C4DE)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Text Prompt Input
+                    OutlinedTextField(
+                        value = promptInput,
+                        onValueChange = { promptInput = it },
+                        placeholder = {
+                            Text(
+                                "Describe simulation (e.g., 'EV high-voltage battery thermal loop')...",
+                                color = Color(0xFF6B7280),
+                                fontSize = 12.sp
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth().testTag("veo_prompt_input"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedContainerColor = Color(0xFF152244),
+                            unfocusedContainerColor = Color(0xFF152244),
+                            focusedBorderColor = NeonCyan,
+                            unfocusedBorderColor = Color(0xFF263868)
+                        ),
+                        maxLines = 3
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Action buttons (Voice Mic + Generate Button)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = onStartStt,
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, NeonCyan),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonCyan),
+                            modifier = Modifier.weight(1f).testTag("veo_voice_prompt_button")
+                        ) {
+                            Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Voice Prompt", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                if (promptInput.isNotBlank()) {
+                                    viewModel.generateVeoVideo(promptInput, selectedAspectRatio)
+                                    promptInput = ""
+                                }
+                            },
+                            enabled = promptInput.isNotBlank() && !isGeneratingVeo,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = NeonCyan,
+                                disabledContainerColor = Color(0xFF1E293B)
+                            ),
+                            modifier = Modifier.weight(1.3f).testTag("veo_generate_button")
+                        ) {
+                            if (isGeneratingVeo) {
+                                CircularProgressIndicator(
+                                    color = Color.Black,
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Rendering...", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            } else {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Generate Video", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Quick Preset Prompts
+        item {
+            Column {
+                Text(
+                    "AUTOMOTIVE SIMULATION PRESETS",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF8D99AE),
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(presetPrompts) { preset ->
+                        Surface(
+                            color = Color(0xFF152244),
+                            shape = RoundedCornerShape(14.dp),
+                            border = BorderStroke(1.dp, Color(0xFF263868)),
+                            modifier = Modifier.clickable {
+                                promptInput = preset
+                            }
+                        ) {
+                            Text(
+                                text = preset,
+                                fontSize = 11.sp,
+                                color = Color(0xFFD0E0FF),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section Title: Generated Video Gallery
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "GENERATED SIMULATION VIDEOS (${veoVideos.size})",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF8D99AE),
+                    letterSpacing = 1.sp
+                )
+                if (veoVideos.isNotEmpty()) {
+                    Text(
+                        "veo-3.1-fast-generate-preview",
+                        fontSize = 10.sp,
+                        color = NeonCyan,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+
+        if (veoVideos.isEmpty()) {
+            item {
+                Surface(
+                    color = Color(0xFF0F172A),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFF1E293B)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Default.Videocam, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(36.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "No videos generated yet",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Tap a preset above or say 'Hey Logic, generate video of cylinder 3 misfire' to create your first Veo 3 simulation.",
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            }
+        } else {
+            items(veoVideos, key = { it.id }) { video ->
+                VeoVideoCard(
+                    video = video,
+                    onShare = {
+                        val sendIntent = android.content.Intent().apply {
+                            action = android.content.Intent.ACTION_SEND
+                            putExtra(android.content.Intent.EXTRA_TEXT, "Veo 3 AI Automotive Video: ${video.videoTitle} (${video.aspectRatio.displayName})")
+                            type = "text/plain"
+                        }
+                        context.startActivity(android.content.Intent.createChooser(sendIntent, "Share Veo Video"))
+                    }
+                )
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(16.dp)) }
     }
 }

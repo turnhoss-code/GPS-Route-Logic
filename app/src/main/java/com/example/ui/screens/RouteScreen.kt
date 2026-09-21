@@ -1,13 +1,23 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +36,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmark
@@ -33,21 +44,27 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Landscape
 import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Traffic
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -60,16 +77,26 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.example.data.model.LiveVoiceSessionState
 import com.example.data.model.RouteOption
 import com.example.data.model.RouteSuggestionType
+import com.example.ui.components.FloatingCopilotHudOverlay
 import com.example.ui.components.MapVisualizer
 import com.example.ui.theme.AlertAmber
 import com.example.ui.theme.ElectricBlue
@@ -97,8 +124,63 @@ fun RouteScreen(
     val isSpeaking by viewModel.isVoiceSpeaking.collectAsState()
     val telemetry by viewModel.telemetry.collectAsState()
     val damageReport by viewModel.damageReport.collectAsState()
+    val cachedOfflineRoutes by viewModel.cachedOfflineRoutes.collectAsState()
 
     val activeCar = vehicles.firstOrNull { it.isDefault } ?: vehicles.firstOrNull()
+    val isSttListening by viewModel.isSttListening.collectAsState()
+    val sttTranscript by viewModel.sttTranscript.collectAsState()
+    val liveVoiceState by viewModel.liveVoiceState.collectAsState()
+    val isChatProcessing by viewModel.isChatProcessing.collectAsState()
+
+    val context = LocalContext.current
+    var hasRecordAudioPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.RECORD_AUDIO
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    var showVoiceCommandSheet by remember { mutableStateOf(false) }
+    var lastNavigationVoiceFeedback by remember { mutableStateOf<String?>(null) }
+
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasRecordAudioPermission = isGranted
+        if (isGranted) {
+            viewModel.startSpeechToText { recognizedText ->
+                viewModel.processNavigationVoiceCommand(recognizedText)
+            }
+        }
+    }
+
+    fun handlePushToTalkClick() {
+        if (!hasRecordAudioPermission) {
+            audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+        } else {
+            if (isSttListening) {
+                viewModel.stopSpeechToText()
+            } else {
+                viewModel.startSpeechToText { recognizedText ->
+                    viewModel.processNavigationVoiceCommand(recognizedText)
+                }
+            }
+        }
+    }
+
+    // Animation for active voice listening pulse
+    val infiniteTransition = rememberInfiniteTransition(label = "ptt_pulse_anim")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.14f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "ptt_scale"
+    )
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
@@ -292,17 +374,34 @@ fun RouteScreen(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Button(
+                                onClick = { viewModel.loadOfflineCachedRoutes() },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, SpeedGreen.copy(alpha = 0.6f)),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("load_offline_routes_button")
+                            ) {
+                                Icon(Icons.Default.Route, contentDescription = null, tint = SpeedGreen, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Offline Cache (${cachedOfflineRoutes.size})", color = SpeedGreen, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                            }
+
                             Button(
                                 onClick = { viewModel.calculateRoutes() },
                                 colors = ButtonDefaults.buttonColors(containerColor = NeonCyan),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.testTag("find_routes_button")
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("find_routes_button")
                             ) {
-                                Icon(Icons.Default.Search, contentDescription = null, tint = Color.Black)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Find Smart Routes", color = Color.Black, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Default.Search, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Find Routes", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             }
                         }
                     }
@@ -520,38 +619,105 @@ fun RouteScreen(
                 }
             }
 
-            // Action Buttons (Start Navigation / Save)
+            // Action Buttons (Start Navigation / Push-to-Talk Voice Co-Pilot / Save)
             item {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Button(
-                        onClick = { viewModel.startNavigating() },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(50.dp)
-                            .testTag("start_navigation_button"),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonCyan)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Navigation, contentDescription = null, tint = Color.Black)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Start GPS Guidance", color = Color.Black, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                        Button(
+                            onClick = { viewModel.startNavigating() },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(52.dp)
+                                .testTag("start_navigation_button"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = NeonCyan)
+                        ) {
+                            Icon(Icons.Default.Navigation, contentDescription = null, tint = Color.Black)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Start GPS Guidance", color = Color.Black, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                        }
+
+                        // Push-to-Talk Gemini Co-Pilot Voice Button
+                        Button(
+                            onClick = { handlePushToTalkClick() },
+                            modifier = Modifier
+                                .height(52.dp)
+                                .scale(if (isSttListening) pulseScale else 1f)
+                                .testTag("push_to_talk_button"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isSttListening) HazardRed else Color(0xFF15264B)
+                            ),
+                            border = BorderStroke(
+                                1.5.dp,
+                                if (isSttListening) HazardRed else NeonCyan
+                            )
+                        ) {
+                            Icon(
+                                imageVector = if (isSttListening) Icons.Default.MicOff else Icons.Default.Mic,
+                                contentDescription = if (isSttListening) "Listening - Tap to Stop" else "Push-to-Talk Voice Command",
+                                tint = if (isSttListening) Color.White else NeonCyan,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isSttListening) "Listening..." else "PTT Mic",
+                                color = if (isSttListening) Color.White else NeonCyan,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
+
+                        Button(
+                            onClick = { viewModel.saveCurrentRoute() },
+                            modifier = Modifier
+                                .height(52.dp)
+                                .testTag("save_route_button"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                        ) {
+                            Icon(Icons.Default.Bookmark, contentDescription = "Save Route", tint = NeonCyan)
+                        }
                     }
 
-                    Button(
-                        onClick = { viewModel.saveCurrentRoute() },
-                        modifier = Modifier
-                            .height(50.dp)
-                            .testTag("save_route_button"),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                    // Voice Command Helper Sheet / Quick Prompts Button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Bookmark, contentDescription = "Save Route", tint = NeonCyan)
+                        Text(
+                            text = if (isSttListening) "🔴 Speak navigation or diagnostic command..." else "Gemini Live Navigation Voice Ready",
+                            fontSize = 11.sp,
+                            color = if (isSttListening) HazardRed else SpeedGreen,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF131F3B),
+                            border = BorderStroke(1.dp, Color(0xFF233660)),
+                            modifier = Modifier.clickable { showVoiceCommandSheet = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.RecordVoiceOver, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(12.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Voice Commands", fontSize = 10.sp, color = NeonCyan, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }
@@ -603,84 +769,81 @@ fun RouteScreen(
             }
         }
 
-        // Live Turn-by-Turn Navigation HUD Overlay
-        AnimatedVisibility(
-            visible = isNavigating,
-            enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
+        // Floating Turn-by-Turn Navigation Co-Pilot HUD Overlay
+        FloatingCopilotHudOverlay(
+            viewModel = viewModel,
             modifier = Modifier.align(Alignment.TopCenter)
+        )
+
+        // Active Voice Recognition & Co-Pilot Response Floating Overlay
+        AnimatedVisibility(
+            visible = isSttListening || isChatProcessing || sttTranscript.isNotBlank(),
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = if (rerouteAlert != null) 160.dp else 80.dp, start = 16.dp, end = 16.dp)
         ) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
-                shape = RoundedCornerShape(20.dp),
-                color = Color(0xF00B132B),
-                border = BorderStroke(2.dp, NeonCyan),
-                shadowElevation = 12.dp
+                    .testTag("voice_copilot_feedback_banner"),
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xF20B132B),
+                border = BorderStroke(1.5.dp, if (isSttListening) HazardRed else NeonCyan),
+                shadowElevation = 14.dp
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(if (isSttListening) HazardRed.copy(alpha = 0.2f) else NeonCyan.copy(alpha = 0.2f))
+                            .scale(if (isSttListening) pulseScale else 1f),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                shape = CircleShape,
+                        if (isChatProcessing) {
+                            CircularProgressIndicator(
                                 color = NeonCyan,
-                                modifier = Modifier.size(38.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                        contentDescription = null,
-                                        tint = Color.Black,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text("NEXT TURN", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NeonCyan)
-                                Text(
-                                    text = viewModel.routeRepo.turnByTurnSteps.getOrElse(navStep) { "Arrived at Destination" },
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = Color.White
-                                )
-                            }
-                        }
-
-                        IconButton(
-                            onClick = { viewModel.stopNavigating() },
-                            modifier = Modifier.testTag("exit_navigation_button")
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = "Exit Nav", tint = Color.White)
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = if (isSttListening) Icons.Default.GraphicEq else Icons.AutoMirrored.Filled.VolumeUp,
+                                contentDescription = null,
+                                tint = if (isSttListening) HazardRed else NeonCyan,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
 
-                    // Next Maneuver Button
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Step ${navStep + 1} of ${viewModel.routeRepo.turnByTurnSteps.size}",
-                            fontSize = 12.sp,
-                            color = Color.LightGray
+                            text = if (isSttListening) "VOICE COMMAND LISTENING..." else if (isChatProcessing) "GEMINI PROCESSING..." else "GEMINI CO-PILOT RESPONSE",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSttListening) HazardRed else NeonCyan
                         )
+                        Text(
+                            text = if (isSttListening) (sttTranscript.ifBlank { "Speak: 'Reroute around traffic' or 'Check tire pressure'..." }) else (sttTranscript.ifBlank { "Command executed" }),
+                            fontSize = 12.sp,
+                            color = Color.White,
+                            maxLines = 2
+                        )
+                    }
 
-                        Button(
-                            onClick = { viewModel.nextNavStep() },
-                            colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.testTag("next_nav_step_button")
+                    if (isSttListening) {
+                        IconButton(
+                            onClick = { viewModel.stopSpeechToText() },
+                            modifier = Modifier.size(30.dp)
                         ) {
-                            Text("Next Maneuver", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Icon(Icons.Default.Close, contentDescription = "Stop", tint = Color.LightGray, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
@@ -745,6 +908,83 @@ fun RouteScreen(
                     }
                 }
             }
+        }
+
+        // Voice Command Cheat Sheet Dialog
+        if (showVoiceCommandSheet) {
+            AlertDialog(
+                onDismissRequest = { showVoiceCommandSheet = false },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Mic, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Gemini Co-Pilot Voice Commands",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NeonCyan
+                        )
+                    }
+                },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Tap the 'PTT Mic' button or press any command below to speak naturally with the Automotive Specialist Co-Pilot:",
+                            fontSize = 12.sp,
+                            color = Color.LightGray
+                        )
+
+                        val sampleCommands = listOf(
+                            "Reroute around traffic" to "Checks alternate GPS routes based on trip logs & highway density",
+                            "Check engine diagnostics" to "Scans OBD2 fault codes & ECU live data",
+                            "Calculate eco route" to "Finds the most fuel-efficient trajectory",
+                            "Is it safe to drive with current DTCs?" to "Diagnoses vehicle severity and safety margin",
+                            "Recommend alternate route" to "Suggests route based on logged telemetry & damage score"
+                        )
+
+                        sampleCommands.forEach { (cmd, desc) ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFF131D36),
+                                border = BorderStroke(1.dp, Color(0xFF233660)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        showVoiceCommandSheet = false
+                                        viewModel.processNavigationVoiceCommand(cmd)
+                                    }
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Text(
+                                        text = "🗣️ \"$cmd\"",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = NeonCyan
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = desc,
+                                        fontSize = 10.sp,
+                                        color = Color(0xFF94A3B8)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { showVoiceCommandSheet = false },
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonCyan)
+                    ) {
+                        Text("Got it", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                },
+                containerColor = Color(0xFF0F172A)
+            )
         }
     }
 }
